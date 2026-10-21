@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../domain/chat.ts";
-import { DEFAULT_SETTINGS, type BotSettings, type FlexSender, type IdentityProvider, type SettingsStore } from "../domain/ports.ts";
+import { DEFAULT_SETTINGS, type BotSettings, type FlexSender, type IdentityProvider, type ImageFacts, type ImageInspector, type SettingsStore } from "../domain/ports.ts";
 import {
   buildCard,
   buildGallery,
@@ -24,9 +24,34 @@ const MAX_LABEL_LENGTH = 24;
 const MAX_SUB_LENGTH = 100;
 const MAX_GALLERY_IMAGES = 10;
 const DEFAULT_PAUSE_MS = 1500;
-const GIF_HINT =
-  "ℹ️ Flex hanya menganimasikan APNG; GIF biasa tampil diam. Ubah GIF-mu jadi APNG yang berputar tanpa henti:\n" +
-  "npx tsx scripts/gif-to-apng.ts <url-atau-file.gif>\nlalu unggah hasilnya ke tempat berlink https dan pakai URL-nya.";
+/** Flex tidak memutar gambar beranimasi di atas 300 KB (dokumentasi LINE); batas ini dibandingkan dengan ukuran sebenarnya. */
+const ANIMATION_MAX_BYTES = 300_000;
+const CONVERT_HINT = "Ubah ke APNG: npx tsx scripts/gif-to-apng.ts <url-atau-file.gif>, lalu unggah hasilnya ke hostingmu.";
+
+/** Peringatan kalau animasi latar tidak akan bergerak seperti yang diharapkan; kosong kalau semuanya beres. */
+export function animationWarnings(facts: ImageFacts): string[] {
+  const kb = facts.bytes === undefined ? undefined : Math.round(facts.bytes / 1000);
+  switch (facts.kind) {
+    case "gif":
+      return [`⚠️ Gambar ini GIF: Flex tidak menganimasikan GIF (tampil diam). ${CONVERT_HINT}`];
+    case "png":
+      return ["ℹ️ Gambar ini PNG biasa (bukan APNG), jadi tidak bergerak."];
+    case "jpeg":
+      return ["ℹ️ Gambar ini JPEG, jadi tidak bergerak."];
+    case "apng": {
+      const warnings: string[] = [];
+      if (facts.bytes !== undefined && facts.bytes > ANIMATION_MAX_BYTES) {
+        warnings.push(`⚠️ APNG ini ${kb} KB, melebihi batas animasi Flex 300 KB, jadi TIDAK diputar (tampil diam). Kecilkan: npx tsx scripts/gif-to-apng.ts <sumber> (batas bawaannya sudah 285 KB).`);
+      }
+      if (facts.plays !== undefined && facts.plays > 0) {
+        warnings.push(`ℹ️ APNG ini hanya berputar ${facts.plays} kali lalu berhenti. Supaya terus bergerak, buat ulang dengan putaran tanpa henti (scripts/gif-to-apng.ts).`);
+      }
+      return warnings;
+    }
+    default:
+      return [];
+  }
+}
 /** Gambar contoh resmi dari CDN LINE, dipakai untuk pratinjau gaya. */
 const SAMPLE_IMAGE_URL = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/01_1_cafe.png";
 /** GIF contoh (Wikimedia Commons) untuk pratinjau gaya `latar`. */
@@ -83,6 +108,8 @@ export class FlexService {
       pauseMs?: number;
       /** Nama dan foto profil akun sendiri untuk bar bawah gaya `latar`. */
       identity?: IdentityProvider;
+      /** Memeriksa gambar latar agar bisa memperingatkan animasi yang tidak akan diputar. */
+      inspector?: ImageInspector;
     },
   ) {}
 
@@ -211,7 +238,7 @@ export class FlexService {
       author: style === "latar" ? await this.author() : undefined,
     });
     await this.send(message, title, card);
-    if (style === "latar" && imageUrl && /\.gif(\?|#|$)/i.test(imageUrl)) await message.reply(GIF_HINT);
+    if (style === "latar" && imageUrl) await this.warnAboutAnimation(imageUrl, message);
   }
 
   /** Perintah `tab flexjson <json>`: JSON bubble atau carousel mentah. */
@@ -279,6 +306,14 @@ export class FlexService {
       const card = buildCard({ ...sampleCard(style, this.defaultTheme, imageUrl), ...(credit ? { credit } : {}), author });
       await this.send(message, `Contoh gaya ${style}`, card);
     }
+  }
+
+  /** Periksa gambar latar dan kirim peringatan kalau animasinya tidak akan diputar; kegagalan memeriksa diabaikan. */
+  private async warnAboutAnimation(imageUrl: string, message: ChatMessage): Promise<void> {
+    const facts = await this.deps.inspector?.inspect(imageUrl).catch(() => null);
+    if (!facts) return;
+    const warnings = animationWarnings(facts);
+    if (warnings.length > 0) await message.reply(warnings.join("\n"));
   }
 
   /** Nama dan foto profil sendiri; gagal mengambil tidak membatalkan kirim (bar bawah dilewati). */

@@ -114,7 +114,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       "contoh → tab flexgaya contoh (semua gaya) atau tab flexgaya contoh banner. Tambah gambar:https://… untuk gambar sendiri.",
       "latar → navbar judul di atas, gambar bergerak memenuhi kartu dengan isi di tengah, bar bawah: teks kredit di kiri + foto profilmu di kanan. Pakai | gaya:latar | gif:https://… (isi \"-\" = tanpa teks).",
       "latar teks kiri → tab flexgaya oleh <teks> (bawaan: Powered By TeamAnuBot).",
-      "latar gerak → Flex hanya menganimasikan APNG (bukan GIF) dan mengikuti jumlah putarannya. Pakai assets/latar-flex.png (tak terbatas) atau ubah GIF: npx tsx scripts/gif-to-apng.ts <gif>. Unggah ke hostingmu. Gambar landscape: tambah | rasio:16:9.",
+      "latar gerak → syarat: APNG (bukan GIF), maks. 300 KB (lebih besar tampil diam), putaran tanpa henti. Bot memeriksa dan memperingatkan. Pakai assets/latar-flex.png atau ubah GIF: npx tsx scripts/gif-to-apng.ts <gif>. Gambar landscape: | rasio:70:39 (atau 16:9).",
       "galeri → tab flexgaleri https://a.jpg | Keterangan | https://b.jpg | Keterangan (maks. 10).",
       "flexjson → tab flexjson {\"type\":\"bubble\",...}. Susun JSON-nya di developers.line.biz/flex-simulator.",
       "Saat pertama kali, akunmu menyetujui izin LIFF app itu. Pakai LIFF app milikmu sendiri atau yang kamu percaya.",

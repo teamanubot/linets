@@ -154,3 +154,18 @@ export interface SelfIdentity {
 export interface IdentityProvider {
   current(): Promise<SelfIdentity>;
 }
+
+/** Fakta tentang sebuah gambar di internet, untuk memperingatkan animasi yang tidak akan diputar. */
+export interface ImageFacts {
+  /** Ukuran file (byte), kalau diketahui. */
+  bytes?: number;
+  kind: "apng" | "png" | "gif" | "jpeg" | "other";
+  /** Hanya APNG: jumlah putaran (0 = tanpa henti). */
+  plays?: number;
+  frames?: number;
+}
+
+export interface ImageInspector {
+  /** Periksa gambar di URL; null kalau tidak bisa diakses. */
+  inspect(url: string): Promise<ImageFacts | null>;
+}

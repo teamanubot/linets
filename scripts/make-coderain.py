@@ -3,7 +3,8 @@ Buat animasi "hujan kode" bertema IT sebagai APNG yang berputar tanpa henti (lat
 
 Pakai:  python3 scripts/make-coderain.py [keluaran.png] [ukuran=320] [warna=hijau|biru|ungu|oranye]
 Butuh:  pip install pillow
-Hasil:  default assets/latar-coderain.png. Unggah ke hostingmu (https), lalu pakai URL-nya:
+Hasil:  default assets/latar-coderain.png (sekitar 460 KB pada 320 px). PERHATIAN: Flex hanya memutar APNG sampai 300 KB;
+        kecilkan ukuran (mis. 200) atau pakai scripts/gif-to-apng.ts. Unggah ke hostingmu (https), lalu pakai URL-nya:
         tab flex Judul | Isi | gaya:latar | gif:https://...
 """
 import random

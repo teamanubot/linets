@@ -28,8 +28,14 @@ export interface ApngOptions {
   maxWidth?: number;
   /** Batas frame per detik untuk percobaan pertama. Default 12. */
   fps?: number;
-  /** Batas ukuran hasil (byte); pengaturan diturunkan bertahap sampai muat. Default 950 KB (Flex menyarankan di bawah 1 MB). */
+  /** Batas ukuran hasil (byte); pengaturan diturunkan bertahap sampai muat. Default 285.000 (batas animasi Flex 300 KB). */
   maxBytes?: number;
+}
+
+export interface ApngSettings {
+  width: number;
+  fps: number;
+  colors: number;
 }
 
 export interface ApngResult {
@@ -41,15 +47,31 @@ export interface ApngResult {
   plays: number;
   /** Apakah hasilnya muat di `maxBytes`. */
   fits: boolean;
-  settings: { width: number; fps: number; colors: number };
+  settings: ApngSettings;
 }
 
-const DEFAULT_MAX_BYTES = 950 * 1024;
+/**
+ * Flex tidak memutar gambar beranimasi (`animated: true`) yang lebih dari 300 KB (tampil diam); dokumentasi LINE juga
+ * membatasi gambar maksimal 1024x1024 piksel. Dipakai batas aman di bawah 300.000 byte.
+ */
+export const FLEX_ANIMATED_MAX_BYTES = 285_000;
+const DEFAULT_MAX_BYTES = FLEX_ANIMATED_MAX_BYTES;
 
 /** Pengaturan dari kualitas tertinggi ke terendah (lebar relatif terhadap `maxWidth`); tiap langkah dicoba sampai ukuran muat. */
-function ladder(maxWidth: number, fps: number): Array<{ width: number; fps: number; colors: number }> {
-  const step = (factor: number, maxFps: number, colors: number) => ({ width: Math.max(2, Math.round(maxWidth * factor)), fps: Math.min(fps, maxFps), colors });
-  return [step(1, 99, 128), step(0.875, 10, 96), step(0.8, 10, 64), step(0.72, 10, 64), step(0.64, 8, 48), step(0.5, 8, 32)];
+function ladder(maxWidth: number, fps: number): ApngSettings[] {
+  const rungs: Array<[factor: number, maxFps: number, colors: number]> = [
+    [1, 99, 128],
+    [0.9, 12, 96],
+    [0.8, 10, 64],
+    [0.72, 10, 48],
+    [0.65, 8, 40],
+    [0.58, 8, 32],
+    [0.52, 8, 28],
+    [0.46, 8, 24],
+    [0.4, 6, 24],
+    [0.32, 6, 16],
+  ];
+  return rungs.map(([factor, maxFps, colors]) => ({ width: Math.max(2, Math.round(maxWidth * factor)), fps: Math.min(fps, maxFps), colors }));
 }
 
 /**
@@ -63,7 +85,7 @@ export async function convertToInfiniteApng(input: Buffer, { maxWidth = 480, fps
   let best: ApngResult | null = null;
 
   for (const settings of ladder(maxWidth, fps)) {
-    const data = await encode(input, settings);
+    const data = await encodeApng(input, settings);
     const info = readApngInfo(data);
     const result: ApngResult = {
       data,
@@ -80,7 +102,8 @@ export async function convertToInfiniteApng(input: Buffer, { maxWidth = 480, fps
   return best!;
 }
 
-function encode(input: Buffer, { width, fps, colors }: { width: number; fps: number; colors: number }): Promise<Buffer> {
+/** Satu kali encode dengan pengaturan tetap (tanpa mencoba turun bertahap). */
+export function encodeApng(input: Buffer, { width, fps, colors }: ApngSettings): Promise<Buffer> {
   return withTempDir(async (dir) => {
     const inputPath = join(dir, "input.bin");
     const outputPath = join(dir, "output.png");
@@ -88,7 +111,8 @@ function encode(input: Buffer, { width, fps, colors }: { width: number; fps: num
     await runFfmpeg([
       "-i", inputPath,
       "-vf",
-      `fps=${fps},scale='min(${width},iw)':-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}[p];[b][p]paletteuse=dither=bayer:bayer_scale=3`,
+      // dither "none": jauh lebih kecil untuk APNG (bayer menambah noise yang sulit dikompres)
+      `fps=${fps},scale='min(${width},iw)':-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}[p];[b][p]paletteuse=dither=none`,
       "-pix_fmt", "pal8",
       "-plays", "0",
       "-f", "apng",

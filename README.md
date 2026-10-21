@@ -151,22 +151,31 @@ Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
 **foto profil LINE-mu** di **kanan** (diambil otomatis dari akun yang menjalankan bot). Contoh:
 
 ```
-tab flex Selamat Pagi | Semangat terus ya | gaya:latar | tema:biru | gif:https://hostingmu.id/latar-flex.png | rasio:25:14
-tab flex Teknologi | - | gaya:latar | gif:https://hostingmu.id/latar-flex.png | rasio:25:14     (isi "-" = gambar saja tanpa teks)
+tab flex Selamat Pagi | Semangat terus ya | gaya:latar | tema:biru | gif:https://hostingmu.id/latar-flex.png | rasio:70:39
+tab flex Teknologi | - | gaya:latar | gif:https://hostingmu.id/latar-flex.png | rasio:70:39     (isi "-" = gambar saja tanpa teks)
 ```
 
 Teks kiri bar bawah: `tab flexgaya oleh <teks>` (tersimpan; `tab flexgaya oleh reset` mengembalikan), atau sekali pakai dengan opsi `| oleh:Teks`.
 Opsi `gif:` / `latar:` / `gambar:` sama saja (URL https). `rasio:LEBAR:TINGGI` mengatur bentuk gambar latar (default `1:1`; untuk GIF landscape
 misalnya `rasio:16:9`), supaya seluruh gambar tampil utuh.
 
-> **Gerak di Flex hanya untuk APNG, bukan GIF.** Hasil uji: GIF biasa tampil diam, stiker animasi LINE (APNG) bergerak tetapi **berhenti** setelah
-> jumlah putaran di dalam file habis (stiker yang diuji: 3 putaran), sedangkan APNG berputar tanpa henti (`num_plays=0`) terus bergerak.
-> - Siap pakai: **`assets/latar-flex.png`**, hasil konversi `assets/latar-flex.gif` (animasi angka biner bertema IT): APNG 400×224, 897 KB,
->   berulang tanpa henti, `rasio:25:14`. Alat pembuat animasi hujan kode juga ada: `python3 scripts/make-coderain.py keluaran.png 320 biru` (butuh Pillow).
-> - Ubah GIF-mu sendiri: `npx tsx scripts/gif-to-apng.ts <url-atau-file.gif> [lebar-maks=480] [fps=12] [batas-KB=950]` → file di `apng-out/`
->   (palet 8-bit; lebar, fps, dan jumlah warna diturunkan bertahap sampai muat di batas; ia juga mencetak `rasio:` yang pas).
-> - **Hosting:** unggah file ke tempat berlink https milikmu, misalnya commit ke repo GitHub lalu pakai link
->   `https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/latar-flex.png`. Usahakan ukuran di bawah 1 MB.
+> **Syarat agar latar bergerak** (dari dokumentasi LINE dan hasil uji):
+> 1. Formatnya **APNG**, bukan GIF. GIF biasa tampil diam.
+> 2. Ukuran file **maksimal 300 KB**. Animasi yang lebih besar **tidak diputar** (tampil diam). Ini batas yang membuat latar 897 KB tidak bergerak,
+>    padahal APNG 62 KB bergerak.
+> 3. Jumlah putarannya **tanpa henti** (`num_plays=0`). Stiker animasi LINE yang diuji hanya 3 putaran lalu berhenti.
+> 4. Maksimal 1024×1024 piksel, URL https.
+>
+> Bot memeriksa gambar `gaya:latar` otomatis dan **memberi peringatan** kalau salah satu syarat tidak terpenuhi (GIF, di atas 300 KB, putaran terbatas, atau bukan APNG).
+>
+> - Siap pakai: **`assets/latar-flex.png`** (animasi angka biner bertema IT): APNG 280×156, 281 KB, 23 frame, tanpa henti, `rasio:70:39`.
+>   Setelah mengubahnya, **commit dan push lagi**; GitHub raw bisa menyimpan cache beberapa menit.
+> - Ubah GIF-mu sendiri: `npx tsx scripts/gif-to-apng.ts <url-atau-file.gif> [lebar-maks=480] [fps=12] [batas-KB=285]` → file di `apng-out/`.
+>   Ia memakai palet 8-bit dan menurunkan lebar, fps, dan jumlah warna bertahap sampai muat di batas, lalu mencetak `rasio:` yang pas.
+>   Pengaturan tetap: `--tetap=LEBAR,FPS,WARNA` (mis. `--tetap=280,8,28`).
+> - Animasi hujan kode: `python3 scripts/make-coderain.py keluaran.png 320 biru` (butuh Pillow; periksa ukurannya tetap di bawah 300 KB).
+> - **Hosting:** unggah ke tempat berlink https milikmu, misalnya commit ke repo GitHub lalu pakai
+>   `https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/latar-flex.png`.
 
 **Opsi** (letakkan di bagian mana pun setelah judul dan isi, dipisah `|`): `gaya:` · `tema:` · `gambar:https://…` · `label:Kategori` ·
 `sub:Subjudul` · `oleh:Nama` · `tombol2:Label>https://…`. Baris isi berbentuk `Label: nilai` (pisahkan baris dengan Enter) tampil sebagai dua kolom.

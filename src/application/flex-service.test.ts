@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import type { FlexSender } from "../domain/ports.ts";
-import { CARD_THEMES, FlexService } from "./flex-service.ts";
+import type { FlexSender, ImageFacts, ImageInspector } from "../domain/ports.ts";
+import { animationWarnings, CARD_THEMES, FlexService } from "./flex-service.ts";
 import { FakeMessage, FakeSettingsStore } from "./test-doubles.ts";
 
 const LIFF = "2009929108-vOiudUbo";
@@ -153,6 +153,29 @@ describe("FlexService", () => {
   });
 });
 
+describe("animationWarnings", () => {
+  it("APNG kecil tanpa henti: tidak ada peringatan", () => {
+    assert.deepEqual(animationWarnings({ kind: "apng", bytes: 62_000, plays: 0 }), []);
+  });
+
+  it("APNG tepat 300.000 byte masih boleh; satu byte lebih tidak", () => {
+    assert.deepEqual(animationWarnings({ kind: "apng", bytes: 300_000, plays: 0 }), []);
+    assert.equal(animationWarnings({ kind: "apng", bytes: 300_001, plays: 0 }).length, 1);
+  });
+
+  it("APNG dengan putaran terbatas: diberi tahu akan berhenti (seperti stiker LINE 3 putaran)", () => {
+    const [warning] = animationWarnings({ kind: "apng", bytes: 84_034, plays: 3 });
+    assert.match(warning!, /hanya berputar 3 kali lalu berhenti/);
+  });
+
+  it("besar dan terbatas sekaligus: dua peringatan; PNG/JPEG biasa: informasi tidak bergerak", () => {
+    assert.equal(animationWarnings({ kind: "apng", bytes: 500_000, plays: 2 }).length, 2);
+    assert.match(animationWarnings({ kind: "png" })[0]!, /PNG biasa/);
+    assert.match(animationWarnings({ kind: "jpeg" })[0]!, /JPEG/);
+    assert.deepEqual(animationWarnings({ kind: "other" }), []);
+  });
+});
+
 describe("FlexService: gaya, pratinjau, galeri", () => {
   let sender: FakeFlexSender;
   let store: FakeSettingsStore;
@@ -298,18 +321,34 @@ describe("FlexService: gaya, pratinjau, galeri", () => {
     assert.equal(sender.sent.length, 1);
   });
 
-  it("gaya latar dengan URL .gif: diberi petunjuk APNG; URL .png tidak", async () => {
-    const gif = new FakeMessage();
-    await service.sendCard("J | I | gaya:latar | gif:https://a.id/x.gif?v=2", gif);
-    const png = new FakeMessage();
-    await service.sendCard("J | I | gaya:latar | gif:https://a.id/x.png", png);
-    const other = new FakeMessage();
-    await service.sendCard("J | I | gaya:bisnis | gambar:https://a.id/x.gif", other);
+  it("gaya latar: gambar diperiksa dan peringatan dikirim bila animasi tidak akan diputar", async () => {
+    const facts: Record<string, ImageFacts | null> = {
+      "https://a.id/besar.png": { kind: "apng", bytes: 918_202, plays: 0, frames: 29 },
+      "https://a.id/ok.png": { kind: "apng", bytes: 280_984, plays: 0, frames: 23 },
+      "https://a.id/anim.gif": { kind: "gif", bytes: 2_148_236 },
+      "https://a.id/mati.png": null,
+    };
+    const inspector: ImageInspector = { inspect: async (url) => facts[url] ?? null };
+    service = new FlexService({ sender, store, pauseMs: 0, inspector });
+    await service.init();
 
-    assert.match(gif.replies[0]!, /hanya menganimasikan APNG.*scripts\/gif-to-apng\.ts/s);
-    assert.deepEqual(png.replies, []);
-    assert.deepEqual(other.replies, []);
-    assert.equal(sender.sent.length, 3);
+    const replies: Record<string, string[]> = {};
+    for (const name of ["besar", "ok", "mati"]) {
+      const message = new FakeMessage();
+      await service.sendCard(`J | I | gaya:latar | gif:https://a.id/${name}.png`, message);
+      replies[name] = message.replies;
+    }
+    const gif = new FakeMessage();
+    await service.sendCard("J | I | gaya:latar | gif:https://a.id/anim.gif", gif);
+    const other = new FakeMessage();
+    await service.sendCard("J | I | gaya:bisnis | gambar:https://a.id/besar.png", other);
+
+    assert.match(replies.besar![0]!, /APNG ini 918 KB, melebihi batas animasi Flex 300 KB.*TIDAK diputar/);
+    assert.deepEqual(replies.ok, []); // 281 KB < 300 KB dan tanpa henti: tidak ada peringatan
+    assert.deepEqual(replies.mati, []); // gagal memeriksa: diam saja
+    assert.match(gif.replies[0]!, /Gambar ini GIF: Flex tidak menganimasikan GIF/);
+    assert.deepEqual(other.replies, []); // hanya gaya latar yang memakai animasi
+    assert.equal(sender.sent.length, 5); // semua tetap terkirim
   });
 
   it("gaya latar: gagal mengambil identitas tidak membatalkan kirim (bar bawah tanpa foto)", async () => {
