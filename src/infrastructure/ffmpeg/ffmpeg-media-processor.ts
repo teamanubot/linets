@@ -4,13 +4,16 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { MediaProcessor } from "../../domain/ports.ts";
+import type { ImageShape, MediaProcessor } from "../../domain/ports.ts";
 
 const run = promisify(execFile);
 const FFMPEG = ffmpegInstaller.path;
 
-/** Potong jadi persegi di tengah lalu perkecil ke 640x640. */
-const SQUARE_FILTER = "crop='min(iw,ih)':'min(iw,ih)',scale=640:640";
+/** Potong di tengah sesuai rasio lalu perkecil: persegi 640x640 atau potret 9:16 540x960. */
+const SHAPE_FILTER: Record<ImageShape, string> = {
+  square: "crop='min(iw,ih)':'min(iw,ih)',scale=640:640",
+  portrait: "crop='min(iw,ih*9/16)':'min(ih,iw*16/9)',scale=540:960",
+};
 
 export async function withTempDir<T>(work: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), "linebot-"));
@@ -25,23 +28,33 @@ export function runFfmpeg(args: string[]): Promise<unknown> {
   return run(FFMPEG, ["-y", ...args]);
 }
 
-/** Ambil satu frame dari file media sebagai JPEG persegi. */
-function firstFrameAsSquareJpeg(input: Buffer): Promise<Buffer> {
+/** Ambil satu frame dari file media sebagai JPEG. */
+function firstFrameAsJpeg(input: Buffer, shape: ImageShape): Promise<Buffer> {
   return withTempDir(async (dir) => {
     const inputPath = join(dir, "input.bin");
     const outputPath = join(dir, "output.jpg");
     await writeFile(inputPath, input);
-    await runFfmpeg(["-i", inputPath, "-frames:v", "1", "-vf", SQUARE_FILTER, "-q:v", "3", outputPath]);
+    await runFfmpeg(["-i", inputPath, "-frames:v", "1", "-vf", SHAPE_FILTER[shape], "-q:v", "3", outputPath]);
     return readFile(outputPath);
   });
 }
 
 export class FfmpegMediaProcessor implements MediaProcessor {
-  toSquareJpeg(image: Buffer): Promise<Buffer> {
-    return firstFrameAsSquareJpeg(image);
+  toJpeg(image: Buffer, shape: ImageShape): Promise<Buffer> {
+    return firstFrameAsJpeg(image, shape);
   }
 
-  extractSquareFrame(video: Buffer): Promise<Buffer> {
-    return firstFrameAsSquareJpeg(video);
+  extractFrame(video: Buffer, shape: ImageShape): Promise<Buffer> {
+    return firstFrameAsJpeg(video, shape);
+  }
+
+  trimVideo(video: Buffer, maxSeconds: number): Promise<Buffer> {
+    return withTempDir(async (dir) => {
+      const inputPath = join(dir, "input.mp4");
+      const outputPath = join(dir, "output.mp4");
+      await writeFile(inputPath, video);
+      await runFfmpeg(["-i", inputPath, "-t", String(maxSeconds), "-c", "copy", "-movflags", "+faststart", outputPath]);
+      return readFile(outputPath);
+    });
   }
 }

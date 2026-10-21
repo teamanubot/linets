@@ -52,16 +52,62 @@ File ini berisi akses ke akunmu: jangan dibagikan dan jangan di-commit (sudah ad
 Bot hanya merespons pesan dari **akunmu sendiri**. Kirim perintah di chat mana pun (misalnya chat "Keep"
 atau chat dengan teman). Semua perintah diawali kata `tab`:
 
+### Umum
+
 | Perintah | Fungsi |
 | --- | --- |
-| `tab help` | Tampilkan daftar perintah |
+| `tab help` | Menu perintah per kelompok. `tab help <profil\|cover\|grup\|otomatis>` untuk penjelasan cara pakai tiap kelompok |
 | `tab ping` | Cek bot hidup (dibalas `pong`) |
 | `tab me` | Tampilkan nama akunmu |
 | `tab echo <teks>` | Bot mengulang teks |
+| `tab batal` | Batalkan alur yang sedang berjalan |
+
+### Profil
+
+| Perintah | Fungsi |
+| --- | --- |
 | `tab pp` | Ganti **foto profil** (gambar). Kalau profilmu sudah punya video, videonya tidak diubah |
 | `tab vp` | Ganti **gambar + video** profil |
 | `tab vp2` | Ganti **video profil saja**, foto tidak diubah |
-| `tab batal` | Batalkan alur yang sedang berjalan |
+| `tab nama <nama>` | Ganti nama tampilan (maks. 20 karakter) |
+| `tab status <teks>` | Ganti status (maks. 500 karakter); tanpa teks = hapus status |
+| `tab save` | **Reply** gambar/video lalu ketik ini untuk menyimpannya ke folder `downloads/` |
+
+### Cover (sampul profil)
+
+Sama seperti foto profil, cover punya **gambar statis** dan **video** terpisah. Gambar otomatis dipotong potret 9:16.
+
+| Perintah | Fungsi |
+| --- | --- |
+| `tab cp` | Ganti **gambar cover**. Video cover, kalau ada, tidak diubah |
+| `tab cv` | Ganti **gambar + video** cover (kirim gambar, lalu video) |
+| `tab cv2` | Ganti **video cover saja**, gambar tidak diubah |
+
+**Video cover maksimal 15 detik.** Server LINE memotongnya sendiri, dan itu tidak bisa ditembus (sudah diuji dengan
+upload 20 dan 150 detik, hasilnya sama-sama 15 detik). Bot memotongnya lebih dulu sebelum mengunggah.
+Berbeda dengan video foto profil yang tidak dibatasi (teruji sampai 10 menit).
+
+### Otomatis
+
+| Perintah | Fungsi |
+| --- | --- |
+| `tab autoreply <teks>` | Balas otomatis chat pribadi dari orang lain. Maks. sekali per orang tiap 30 menit, grup tidak dibalas. `tab autoreply off` untuk mematikan, tanpa teks untuk melihat status |
+| `tab antiunsend on/off` | Kabari kamu (di chat dengan diri sendiri) isi pesan yang ditarik orang lain. Default aktif. Hanya pesan yang diterima saat bot berjalan |
+
+Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
+
+### Grup
+
+Perintah grup hanya berlaku di chat grup, kecuali `tab join`.
+
+| Perintah | Fungsi |
+| --- | --- |
+| `tab linkgrup` | Aktifkan dan kirim link grup. Membuat link baru, jadi link lama tidak berlaku lagi |
+| `tab join <link>` | Gabung grup lewat link (`https://line.me/R/ti/g/...`) atau tiketnya |
+| `tab namagrup <nama>` | Ganti nama grup (maks. 50 karakter) |
+| `tab invite @teman` | Undang lewat mention, atau `tab invite <id pengguna>` |
+| `tab tendang @orang` | Keluarkan orang yang di-mention (butuh hak admin grup) |
+| `tab keluar` | Keluar dari grup. Minta konfirmasi: ketik `tab keluar ya` |
 
 ### Alur ganti foto profil
 
@@ -84,6 +130,7 @@ atau chat dengan teman). Semua perintah diawali kata `tab`:
 Catatan:
 - Setiap langkah menunggu maksimal **2 menit**, lalu alur dibatalkan sendiri.
 - Gambar otomatis dipotong persegi 640x640.
+- `tab save` hanya bisa mengambil media dari pesan yang masih ada di cache bot atau di ~100 pesan terakhir chat itu.
 - Video lebih dari 2 menit bisa diupload; server LINE menyimpan video utuh. Thumbnail kecil di avatar hanya memutar sekitar 6 detik.
 - Profil di server LINE diperbarui dengan jeda beberapa detik. Tutup lalu buka lagi profilmu kalau belum berubah.
 
@@ -95,15 +142,16 @@ Catatan:
 | `npm run typecheck` | Cek tipe TypeScript |
 | `npm test` | Jalankan unit test |
 
-Ada juga skrip tes live `scripts/live-profile-test.ts` yang **mengubah foto profil akunmu**.
-Jalankan hanya kalau perlu: `npx tsx scripts/live-profile-test.ts`.
+Skrip tes live di `scripts/` **mengubah akunmu** (lalu memulihkannya), jalankan hanya kalau perlu:
+`live-profile-test.ts` (foto profil), `live-cover-test.ts` (cover), dan `live-bot-e2e.ts` (semua perintah lewat chat;
+butuh folder kerja dan file foto profil asli sebagai cadangan, lihat komentar di atas skrip).
 
 ## Struktur project
 
 ```
 src/
-  domain/          tipe dan antarmuka (ChatMessage, ProfileGateway, MediaProcessor)
-  application/     logika alur ganti foto profil + unit test
+  domain/          tipe dan antarmuka (ChatMessage, ProfileGateway, GroupGateway, ...)
+  application/     logika: alur foto profil, akun, grup, simpan media + unit test
   infrastructure/  LINE (login, OBS, adapter pesan) dan ffmpeg
   presentation/    parser perintah "tab ..." dan event handler bot
   main.ts          titik masuk (merakit semua bagian)

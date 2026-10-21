@@ -1,35 +1,68 @@
-import type { ProfileFlow } from "../application/profile-flow.ts";
+import type { AntiUnsend } from "../application/anti-unsend.ts";
+import type { AutoReply } from "../application/auto-reply.ts";
+import type { AccountService } from "../application/account-service.ts";
+import type { GroupService } from "../application/group-service.ts";
+import type { MediaSaver } from "../application/media-saver.ts";
+import type { FlowName, ProfileFlow } from "../application/profile-flow.ts";
 import type { ChatMessage } from "../domain/chat.ts";
+import { renderHelp } from "./help.ts";
 
 export const COMMAND_PREFIX = "tab";
 
-const HELP_TEXT = [
-  "Perintah:",
-  "tab pp - ganti foto profil (video profil, kalau ada, tidak diubah)",
-  "tab vp - ganti foto + video profil (kirim foto, lalu video)",
-  "tab vp2 - ganti video profil saja (foto tidak diubah)",
-  "tab batal - batalkan",
-  "tab help, tab ping, tab me, tab echo <teks>",
-].join("\n");
+/** Mulai satu alur; alur lain yang sedang berjalan dibatalkan supaya media tidak salah sasaran. */
+function startFlow(flow: ProfileFlow, other: ProfileFlow, name: FlowName, message: ChatMessage): Promise<void> {
+  other.cancel();
+  return flow.start(name, message);
+}
 
 export type Command = (args: string, message: ChatMessage) => Promise<void>;
 
 export interface CommandDeps {
   profileFlow: ProfileFlow;
+  coverFlow: ProfileFlow;
+  account: AccountService;
+  groups: GroupService;
+  mediaSaver: MediaSaver;
+  autoReply: AutoReply;
+  antiUnsend: AntiUnsend;
   displayName: string;
 }
 
-export function createCommands({ profileFlow, displayName }: CommandDeps): Record<string, Command> {
+export function createCommands({
+  profileFlow,
+  coverFlow,
+  account,
+  groups,
+  mediaSaver,
+  autoReply,
+  antiUnsend,
+  displayName,
+}: CommandDeps): Record<string, Command> {
   return {
-    help: (_args, message) => message.reply(HELP_TEXT),
+    help: (args, message) => message.reply(renderHelp(args)),
     ping: (_args, message) => message.reply("pong 🏓"),
     echo: (args, message) => message.reply(args || "(kosong)"),
     me: (_args, message) => message.reply(`Nama: ${displayName}`),
-    pp: (_args, message) => profileFlow.start("pp", message),
-    vp: (_args, message) => profileFlow.start("vp", message),
-    vp2: (_args, message) => profileFlow.start("vp2", message),
+    pp: (_args, message) => startFlow(profileFlow, coverFlow, "pp", message),
+    vp: (_args, message) => startFlow(profileFlow, coverFlow, "vp", message),
+    vp2: (_args, message) => startFlow(profileFlow, coverFlow, "vp2", message),
+    cp: (_args, message) => startFlow(coverFlow, profileFlow, "pp", message),
+    cv: (_args, message) => startFlow(coverFlow, profileFlow, "vp", message),
+    cv2: (_args, message) => startFlow(coverFlow, profileFlow, "vp2", message),
+    nama: (args, message) => account.setName(args, message),
+    status: (args, message) => account.setStatus(args, message),
+    save: (_args, message) => mediaSaver.saveReplied(message),
+    linkgrup: (_args, message) => groups.createLink(message),
+    join: (args, message) => groups.join(args, message),
+    namagrup: (args, message) => groups.rename(args, message),
+    invite: (args, message) => groups.invite(args, message),
+    tendang: (_args, message) => groups.kick(message),
+    keluar: (args, message) => groups.leave(args, message),
+    autoreply: (args, message) => autoReply.configure(args, message),
+    antiunsend: (args, message) => antiUnsend.configure(args, message),
     batal: async (_args, message) => {
       profileFlow.cancel();
+      coverFlow.cancel();
       await message.reply("Dibatalkan.");
     },
   };

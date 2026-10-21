@@ -1,60 +1,18 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import type { ChatMessage, MediaKind } from "../domain/chat.ts";
-import type { MediaProcessor, ProfileGateway } from "../domain/ports.ts";
+import type { MediaProcessor } from "../domain/ports.ts";
 import { ProfileFlow } from "./profile-flow.ts";
-
-const buf = (text: string) => Buffer.from(text);
-
-class FakeProfile implements ProfileGateway {
-  calls: string[] = [];
-  video = false;
-
-  async hasVideo() {
-    return this.video;
-  }
-  async setImage(jpg: Buffer) {
-    this.calls.push(`setImage:${jpg}`);
-  }
-  async setImageKeepVideo(jpg: Buffer) {
-    this.calls.push(`setImageKeepVideo:${jpg}`);
-  }
-  async setVideo(video: Buffer, image: Buffer) {
-    this.calls.push(`setVideo:${video}+${image}`);
-  }
-  async setVideoKeepImage(video: Buffer) {
-    this.calls.push(`setVideoKeepImage:${video}`);
-  }
-}
+import { buf, FakeMessage, FakeProfile } from "./test-doubles.ts";
 
 const fakeMedia: MediaProcessor = {
-  toSquareJpeg: async (image) => buf(`jpg(${image})`),
-  extractSquareFrame: async (video) => buf(`frame(${video})`),
+  toJpeg: async (image, shape) => buf(`jpg(${image})`.replace("jpg", shape === "portrait" ? "pjpg" : "jpg")),
+  extractFrame: async (video, shape) => buf(`${shape === "portrait" ? "pframe" : "frame"}(${video})`),
+  trimVideo: async (video, maxSeconds) => buf(`${video}@${maxSeconds}s`),
 };
 
-class FakeMessage implements ChatMessage {
-  replies: string[] = [];
-  readonly isFromSelf = true;
-
-  constructor(
-    readonly mediaKind: MediaKind | null,
-    private readonly data = "",
-  ) {}
-
-  get text() {
-    return "";
-  }
-  async reply(text: string) {
-    this.replies.push(text);
-  }
-  async downloadMedia() {
-    return buf(this.data);
-  }
-}
-
-const image = (data: string) => new FakeMessage("image", data);
-const video = (data: string) => new FakeMessage("video", data);
-const command = () => new FakeMessage(null);
+const image = (data: string) => new FakeMessage({ mediaKind: "image", data });
+const video = (data: string) => new FakeMessage({ mediaKind: "video", data });
+const command = () => new FakeMessage();
 
 describe("ProfileFlow", () => {
   let profile: FakeProfile;
@@ -125,7 +83,7 @@ describe("ProfileFlow", () => {
     await flow.start("pp", command());
     clock = 1001;
     const photo = image("foto");
-    assert.equal(await flow.handleMedia(photo), true);
+    assert.equal(await flow.handleMedia(photo), false);
 
     assert.deepEqual(profile.calls, []);
     assert.deepEqual(photo.replies, []);
@@ -140,5 +98,42 @@ describe("ProfileFlow", () => {
 
   it("pesan teks bukan media", async () => {
     assert.equal(await flow.handleMedia(command()), false);
+  });
+});
+
+describe("ProfileFlow untuk cover", () => {
+  it("memakai bentuk potret, label cover, dan memotong video ke batas", async () => {
+    const profile = new FakeProfile();
+    const flow = new ProfileFlow({
+      profile,
+      media: fakeMedia,
+      labels: { still: "cover", video: "video cover" },
+      shape: "portrait",
+      maxVideoSeconds: 15,
+    });
+    await flow.start("vp", command());
+    await flow.handleMedia(image("foto"));
+    const clip = video("klip");
+    await flow.handleMedia(clip);
+
+    assert.deepEqual(profile.calls, ["setVideo:klip@15s+pjpg(foto)"]);
+    assert.match(clip.replies.at(-1)!, /Berhasil: video cover.*maks\. 15 detik/);
+  });
+
+  it("pp dengan video: pesan memakai label cover", async () => {
+    const profile = new FakeProfile();
+    profile.video = true;
+    const flow = new ProfileFlow({ profile, media: fakeMedia, labels: { still: "cover", video: "video cover" }, shape: "portrait" });
+    await flow.start("pp", command());
+    const photo = image("foto");
+    await flow.handleMedia(photo);
+
+    assert.deepEqual(profile.calls, ["setImageKeepVideo:pjpg(foto)"]);
+    assert.match(photo.replies[0]!, /cover sudah diganti, video cover tidak diubah/);
+  });
+
+  it("media tanpa alur aktif tidak dianggap ditangani", async () => {
+    const flow = new ProfileFlow({ profile: new FakeProfile(), media: fakeMedia });
+    assert.equal(await flow.handleMedia(image("foto")), false);
   });
 });

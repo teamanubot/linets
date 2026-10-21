@@ -1,2 +1,5 @@
 .storage.json
+.storage-*.json
+.settings.json
 node_modules
+downloads

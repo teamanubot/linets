@@ -15,6 +15,14 @@ const toBlob = (data: Buffer, type: string) => new Blob([new Uint8Array(data)], 
 export class LineProfileGateway implements ProfileGateway {
   constructor(private readonly client: Client) {}
 
+  async setDisplayName(name: string): Promise<void> {
+    await this.client.updateMyDisplayName(name);
+  }
+
+  async setStatusMessage(text: string): Promise<void> {
+    await this.client.updateMyStatusMessage(text);
+  }
+
   async hasVideo(): Promise<boolean> {
     return Boolean((await this.fetchProfile()).videoProfile);
   }
