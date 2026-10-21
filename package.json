@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@tab/linets": "npm:@jsr/tab__linets@^3.5.1",
+    "@tab/linets": "npm:@jsr/tab__linets@^3.5.2",
     "qrcode-terminal": "^0.12.0",
     "youtube-dl-exec": "^3.1.17"
   },

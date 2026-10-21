@@ -66,7 +66,7 @@ export function describeLoginError(error: unknown): Error {
 
 /** Login memakai token tersimpan; kalau tidak ada/tidak valid, login dengan QR. */
 export async function login(storage: FileStorage): Promise<Client> {
-  const options: InitOptions = { device: "DESKTOPWIN", storage };
+  const options: InitOptions = { device: "DESKTOPWIN", deviceName: "TeamAnuBot", storage };
   try {
     return (await loginWithSavedToken(storage, options)) ?? (await loginWithQrCode(storage, options));
   } catch (error) {
