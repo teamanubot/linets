@@ -2,6 +2,10 @@ import type { AntiUnsend } from "../application/anti-unsend.ts";
 import type { AutoReply } from "../application/auto-reply.ts";
 import type { AccountService } from "../application/account-service.ts";
 import type { GroupService } from "../application/group-service.ts";
+import type { SpeedTest } from "../application/speed-test.ts";
+import type { ProfilePictures } from "../application/profile-pictures.ts";
+import type { YoutubeVideo } from "../application/youtube-video.ts";
+import type { FlexService } from "../application/flex-service.ts";
 import type { MediaSaver } from "../application/media-saver.ts";
 import type { FlowName, ProfileFlow } from "../application/profile-flow.ts";
 import type { ChatMessage } from "../domain/chat.ts";
@@ -25,6 +29,10 @@ export interface CommandDeps {
   mediaSaver: MediaSaver;
   autoReply: AutoReply;
   antiUnsend: AntiUnsend;
+  speedTest: SpeedTest;
+  youtube: YoutubeVideo;
+  pictures: ProfilePictures;
+  flex: FlexService;
   displayName: string;
 }
 
@@ -36,16 +44,28 @@ export function createCommands({
   mediaSaver,
   autoReply,
   antiUnsend,
+  speedTest,
+  youtube,
+  pictures,
+  flex,
   displayName,
 }: CommandDeps): Record<string, Command> {
   return {
     help: (args, message) => message.reply(renderHelp(args)),
     ping: (_args, message) => message.reply("pong 🏓"),
+    speed: (_args, message) => speedTest.run(message),
     echo: (args, message) => message.reply(args || "(kosong)"),
     me: (_args, message) => message.reply(`Nama: ${displayName}`),
     pp: (_args, message) => startFlow(profileFlow, coverFlow, "pp", message),
     vp: (_args, message) => startFlow(profileFlow, coverFlow, "vp", message),
     vp2: (_args, message) => startFlow(profileFlow, coverFlow, "vp2", message),
+    vpl: (args, message) => youtube.setAsProfileVideo(args, message),
+    tpp: (args, message) => pictures.show(args, message),
+    flex: (args, message) => flex.sendCard(args, message),
+    flexjson: (args, message) => flex.sendJson(args, message),
+    flexgaya: (args, message) => flex.configureStyle(args, message),
+    flexgaleri: (args, message) => flex.sendGallery(args, message),
+    liff: (args, message) => flex.configureLiff(args, message),
     cp: (_args, message) => startFlow(coverFlow, profileFlow, "pp", message),
     cv: (_args, message) => startFlow(coverFlow, profileFlow, "vp", message),
     cv2: (_args, message) => startFlow(coverFlow, profileFlow, "vp2", message),

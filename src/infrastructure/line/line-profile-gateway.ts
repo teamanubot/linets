@@ -46,7 +46,7 @@ export class LineProfileGateway implements ProfileGateway {
     };
 
     // Video lebih dulu: gambar yang masuk belakangan yang "mengunci" perubahan profil.
-    await this.client.base.obs.uploadObjectForService({
+    const uploaded = await this.client.base.obs.uploadObjectForService({
       data: toBlob(video, "video/mp4"),
       oType: "video",
       obsPath: `talk/vp/${mid}`,
@@ -54,6 +54,9 @@ export class LineProfileGateway implements ProfileGateway {
       filename: "profile.mp4",
       addHeaders,
     });
+    // LINEJS tidak memeriksa status HTTP: upload yang ditolak (mis. 413 untuk file > ±200 MB) lolos diam-diam
+    // dengan id kosong, sehingga profil tidak berubah padahal terlihat berhasil.
+    if (!uploaded.objHash) throw new Error("Upload video ditolak server LINE (kemungkinan file terlalu besar, batas ±200 MB).");
     await this.client.base.obs.uploadObjectForService({
       data: toBlob(image, "image/jpeg"),
       oType: "image",

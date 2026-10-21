@@ -65,16 +65,18 @@ export class AntiUnsend {
     }
   }
 
-  async onUnsent(messageId: string): Promise<void> {
+  /** Mengembalikan true kalau pemilik akun diberi tahu. */
+  async onUnsent(messageId: string): Promise<boolean> {
     const remembered = this.messages.get(messageId);
-    if (!remembered) return;
+    if (!remembered) return false;
     this.messages.delete(messageId);
-    if (!this.enabled) return;
+    if (!this.enabled) return false;
 
     const sender = await this.deps.people.displayName(remembered.senderId);
     const content = remembered.text || (remembered.mediaKind ? MEDIA_LABEL[remembered.mediaKind] : "(pesan non-teks)");
     await this.deps.notifier.notify(
       `🗑️ Pesan ditarik\nDari: ${sender}\nDi: ${remembered.isGroupChat ? "grup" : "chat pribadi"}\nIsi: ${content}`,
     );
+    return true;
   }
 }

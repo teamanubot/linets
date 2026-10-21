@@ -11,6 +11,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AccountService } from "../src/application/account-service.ts";
 import { AntiUnsend } from "../src/application/anti-unsend.ts";
+import { FlexService } from "../src/application/flex-service.ts";
+import { ProfilePictures } from "../src/application/profile-pictures.ts";
+import { YoutubeVideo } from "../src/application/youtube-video.ts";
+import { SpeedTest } from "../src/application/speed-test.ts";
 import { AutoReply } from "../src/application/auto-reply.ts";
 import { GroupService } from "../src/application/group-service.ts";
 import { MediaSaver } from "../src/application/media-saver.ts";
@@ -19,9 +23,14 @@ import { FfmpegMediaProcessor, runFfmpeg, withTempDir } from "../src/infrastruct
 import { FileMediaStore } from "../src/infrastructure/file-media-store.ts";
 import { FileSettingsStore } from "../src/infrastructure/file-settings-store.ts";
 import { login } from "../src/infrastructure/line/auth.ts";
+import { YtDlpDownloader } from "../src/infrastructure/yt-dlp-downloader.ts";
+import { LineApiProbe } from "../src/infrastructure/line/line-api-probe.ts";
 import { LineCoverGateway } from "../src/infrastructure/line/line-cover-gateway.ts";
 import { LineGroupGateway } from "../src/infrastructure/line/line-group-gateway.ts";
 import { LineNotifier, LinePeopleDirectory } from "../src/infrastructure/line/line-notifier.ts";
+import { LineFlexSender } from "../src/infrastructure/line/line-flex-sender.ts";
+import { LineMediaSender } from "../src/infrastructure/line/line-media-sender.ts";
+import { LineProfileViewer } from "../src/infrastructure/line/line-profile-viewer.ts";
 import { LineProfileGateway } from "../src/infrastructure/line/line-profile-gateway.ts";
 import { startLineBot } from "../src/presentation/line-bot.ts";
 
@@ -40,6 +49,7 @@ const antiUnsend = new AntiUnsend({ store: settings, notifier: new LineNotifier(
 await Promise.all([autoReply.init(), antiUnsend.init()]);
 startLineBot({
   client,
+  people: new LinePeopleDirectory(client),
   displayName: "uji",
   profileFlow: new ProfileFlow({ profile, media }),
   coverFlow: new ProfileFlow({
@@ -54,6 +64,10 @@ startLineBot({
   mediaSaver: new MediaSaver(new FileMediaStore(join(workDir, "downloads"))),
   autoReply,
   antiUnsend,
+  speedTest: new SpeedTest({ probe: new LineApiProbe(client) }),
+  youtube: new YoutubeVideo({ downloader: new YtDlpDownloader(), profile, media }),
+  flex: new FlexService({ sender: new LineFlexSender(client), store: settings }),
+  pictures: new ProfilePictures({ viewer: new LineProfileViewer(client), sender: new LineMediaSender(client), media, selfId: mid }),
 });
 
 const replies: string[] = [];

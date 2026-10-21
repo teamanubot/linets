@@ -8,6 +8,8 @@ const fakeMedia: MediaProcessor = {
   toJpeg: async (image, shape) => buf(`jpg(${image})`.replace("jpg", shape === "portrait" ? "pjpg" : "jpg")),
   extractFrame: async (video, shape) => buf(`${shape === "portrait" ? "pframe" : "frame"}(${video})`),
   trimVideo: async (video, maxSeconds) => buf(`${video}@${maxSeconds}s`),
+  videoDurationMs: async () => 1000,
+  toSquareVideo: async (video, mode) => buf(`${video}#${mode}`),
 };
 
 const image = (data: string) => new FakeMessage({ mediaKind: "image", data });

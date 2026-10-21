@@ -20,6 +20,17 @@ export interface ProfileGateway extends PictureGateway {
 /** Bentuk gambar: foto profil persegi 640x640, cover potret 540x960. */
 export type ImageShape = "square" | "portrait";
 
+/** Cara membuat video jadi persegi: seluruh gambar dimuat dengan latar buram, atau dipotong di tengah. */
+export type SquareVideoMode = "fit" | "crop";
+
+export interface SquareVideoOptions {
+  mode: SquareVideoMode;
+  /** Sisi persegi dalam piksel, mis. 1080 atau 2160. */
+  side: number;
+  /** Batas bitrate video (kbps); menjaga ukuran file di bawah batas upload LINE. */
+  videoKbps: number;
+}
+
 /** Pengolahan gambar/video (diimplementasikan oleh infrastructure). */
 export interface MediaProcessor {
   /** Ubah gambar apa pun jadi JPEG dengan bentuk tertentu (dipotong di tengah). */
@@ -28,6 +39,10 @@ export interface MediaProcessor {
   extractFrame(video: Buffer, shape: ImageShape): Promise<Buffer>;
   /** Potong video menjadi paling lama `maxSeconds` detik (tanpa encode ulang). */
   trimVideo(video: Buffer, maxSeconds: number): Promise<Buffer>;
+  /** Durasi video dalam milidetik. */
+  videoDurationMs(video: Buffer): Promise<number>;
+  /** Ubah file video jadi persegi (H.264 + suara AAC) dengan ukuran dan bitrate tertentu. */
+  toSquareVideo(inputPath: string, options: SquareVideoOptions): Promise<Buffer>;
 }
 
 /** Operasi grup (diimplementasikan oleh infrastructure). */
@@ -52,11 +67,17 @@ export interface MediaStore {
 export interface BotSettings {
   autoReply: { enabled: boolean; text: string };
   antiUnsend: { enabled: boolean };
+  /** LIFF app yang dipakai untuk mengirim Flex Message; kosong = belum diatur. */
+  liff: { id: string };
+  /** Gaya dan tema bawaan kartu Flex (nama gaya/tema divalidasi oleh aplikasi). */
+  flex: { style: string; theme: string; /** Teks kiri bar bawah gaya `latar`. */ credit: string };
 }
 
 export const DEFAULT_SETTINGS: BotSettings = {
   autoReply: { enabled: false, text: "" },
   antiUnsend: { enabled: true },
+  liff: { id: "" },
+  flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" },
 };
 
 export interface SettingsStore {
@@ -72,4 +93,64 @@ export interface Notifier {
 /** Mencari nama tampilan pengguna. */
 export interface PeopleDirectory {
   displayName(userId: string): Promise<string>;
+}
+
+/** Satu panggilan API ringan ke server chat, untuk mengukur waktu respon. */
+export interface ApiProbe {
+  ping(): Promise<void>;
+}
+
+export interface VideoInfo {
+  title: string;
+  durationSeconds: number;
+  /** Tinggi video terbaik yang tersedia (maks. 2160), untuk memilih kualitas. */
+  maxHeight: number;
+}
+
+/** Video hasil unduhan di disk; panggil `dispose()` untuk menghapus file sementaranya. */
+export interface DownloadedVideo {
+  path: string;
+  dispose(): Promise<void>;
+}
+
+/** Mengunduh video dari internet (diimplementasikan oleh infrastructure). */
+export interface VideoDownloader {
+  info(url: string): Promise<VideoInfo>;
+  /** Unduh kualitas terbaik sampai `maxHeight` (video + audio) ke file sementara. */
+  download(url: string, maxHeight: number): Promise<DownloadedVideo>;
+}
+
+export interface UserPicture {
+  name: string;
+  /** Foto profil, atau null kalau tidak punya. */
+  image: Buffer | null;
+  /** Video profil, atau null kalau tidak punya. */
+  video: Buffer | null;
+}
+
+/** Melihat foto/video profil pengguna mana pun (diimplementasikan oleh infrastructure). */
+export interface ProfileViewer {
+  fetchPicture(userId: string): Promise<UserPicture>;
+}
+
+/** Mengirim gambar/video ke sebuah chat (diimplementasikan oleh infrastructure). */
+export interface MediaSender {
+  sendImage(chatId: string, image: Buffer): Promise<void>;
+  sendVideo(chatId: string, video: Buffer, durationMs: number): Promise<void>;
+}
+
+/** Mengirim Flex Message sebagai akun sendiri (lewat LIFF). */
+export interface FlexSender {
+  send(chatId: string, liffId: string, altText: string, contents: Record<string, unknown>): Promise<void>;
+}
+
+/** Identitas akun sendiri untuk ditampilkan di kartu (nama dan foto profil publik). */
+export interface SelfIdentity {
+  name: string;
+  /** URL foto profil (https), atau tidak ada kalau akun belum punya foto. */
+  pictureUrl?: string;
+}
+
+export interface IdentityProvider {
+  current(): Promise<SelfIdentity>;
 }

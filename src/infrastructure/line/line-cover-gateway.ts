@@ -113,6 +113,7 @@ export class LineCoverGateway implements PictureGateway {
       filename,
       addHeaders: { "X-Line-ChannelToken": await this.channelToken() },
     });
-    return objId || objectId;
+    if (!objId) throw new Error("Upload cover ditolak server LINE (kemungkinan file terlalu besar).");
+    return objId;
   }
 }

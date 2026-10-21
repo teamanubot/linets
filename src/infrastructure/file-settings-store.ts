@@ -11,6 +11,8 @@ export class FileSettingsStore implements SettingsStore {
       return {
         autoReply: { ...DEFAULT_SETTINGS.autoReply, ...saved.autoReply },
         antiUnsend: { ...DEFAULT_SETTINGS.antiUnsend, ...saved.antiUnsend },
+        liff: { ...DEFAULT_SETTINGS.liff, ...saved.liff },
+        flex: { ...DEFAULT_SETTINGS.flex, ...saved.flex },
       };
     } catch {
       return structuredClone(DEFAULT_SETTINGS);

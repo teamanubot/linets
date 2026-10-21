@@ -30,15 +30,17 @@ export class AutoReply {
     this.settings = await this.deps.store.load();
   }
 
-  async handleIncoming(message: ChatMessage): Promise<void> {
+  /** Mengembalikan true kalau membalas. */
+  async handleIncoming(message: ChatMessage): Promise<boolean> {
     const { enabled, text } = this.settings.autoReply;
-    if (!enabled || !text || message.isFromSelf || message.isGroupChat) return;
+    if (!enabled || !text || message.isFromSelf || message.isGroupChat) return false;
 
     const last = this.lastReplyAt.get(message.senderId);
-    if (last !== undefined && this.now() - last < this.cooldownMs) return;
+    if (last !== undefined && this.now() - last < this.cooldownMs) return false;
 
     this.lastReplyAt.set(message.senderId, this.now());
     await message.reply(text);
+    return true;
   }
 
   /** Perintah `tab autoreply [teks | off]`. */
