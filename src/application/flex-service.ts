@@ -77,9 +77,11 @@ const HELP_BACKGROUND_URL = "https://raw.githubusercontent.com/teamanubot/linets
  */
 function helpRatio(text: string): string {
   const WIDTH = 300;
-  const CHARS_PER_LINE = 48;
-  const LINE_HEIGHT = 19;
-  const CHROME = 190;
+  // Konservatif (karakter/baris lebih kecil dari lebar sebenarnya) supaya ada margin aman:
+  // LINE membungkus teks lebih cepat dari perkiraan kasar ini, jadi kartu dibuat sedikit lebih tinggi dari perlu.
+  const CHARS_PER_LINE = 38;
+  const LINE_HEIGHT = 15;
+  const CHROME = 200;
   const lines = text.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE)), 0);
   const height = Math.min(CHROME + lines * LINE_HEIGHT, 3 * WIDTH);
   return `${WIDTH}:${height}`;
@@ -366,7 +368,7 @@ export class FlexService {
         theme: this.defaultTheme,
         imageUrl: HELP_BACKGROUND_URL,
         ratio: helpRatio(card.text),
-        textSize: "xs",
+        textSize: "xxs",
         textAlign: "start",
         credit: this.settings.flex.credit,
         author: await this.author(),
