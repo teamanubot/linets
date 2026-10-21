@@ -1,4 +1,4 @@
-import type { Client } from "@evex/linejs";
+import type { Client } from "@tab/linets";
 import type { ProfileGateway } from "../../domain/ports.ts";
 
 const OBS_BASE_URL = "https://obs.line-scdn.net";

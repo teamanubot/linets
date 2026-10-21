@@ -1,4 +1,4 @@
-import type { TalkMessage } from "@evex/linejs";
+import type { TalkMessage } from "@tab/linets";
 import type { ChatMessage, MediaKind } from "../../domain/chat.ts";
 
 /** Membungkus TalkMessage dari LINEJS sebagai ChatMessage. */

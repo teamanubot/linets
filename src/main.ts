@@ -1,4 +1,4 @@
-import { FileStorage } from "@evex/linejs/storage";
+import { FileStorage } from "@tab/linets/storage";
 import { ProfileFlow } from "./application/profile-flow.ts";
 import { FfmpegMediaProcessor } from "./infrastructure/ffmpeg/ffmpeg-media-processor.ts";
 import { login } from "./infrastructure/line/auth.ts";

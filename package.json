@@ -10,8 +10,8 @@
     "test": "tsx --test $(find src -name '*.test.ts')"
   },
   "dependencies": {
-    "@evex/linejs": "npm:@jsr/evex__linejs@^3.5.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@tab/linets": "npm:@jsr/tab__linets@^3.5.1",
     "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {

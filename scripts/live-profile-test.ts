@@ -3,7 +3,7 @@
  * Pakai: npx tsx scripts/live-profile-test.ts [detik-video=150]
  * Setelah selesai, pulihkan foto profil secara manual.
  */
-import { FileStorage } from "@evex/linejs/storage";
+import { FileStorage } from "@tab/linets/storage";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runFfmpeg, withTempDir } from "../src/infrastructure/ffmpeg/ffmpeg-media-processor.ts";

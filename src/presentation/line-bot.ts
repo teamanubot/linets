@@ -1,4 +1,4 @@
-import type { Client, TalkMessage } from "@evex/linejs";
+import type { Client, TalkMessage } from "@tab/linets";
 import type { ProfileFlow } from "../application/profile-flow.ts";
 import { LineChatMessage } from "../infrastructure/line/line-chat-message.ts";
 import { createCommands, parseCommand } from "./commands.ts";

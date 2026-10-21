@@ -1,5 +1,5 @@
-import { loginWithAuthToken, loginWithQR, type Client, type InitOptions } from "@evex/linejs";
-import type { FileStorage } from "@evex/linejs/storage";
+import { loginWithAuthToken, loginWithQR, type Client, type InitOptions } from "@tab/linets";
+import type { FileStorage } from "@tab/linets/storage";
 import { createRequire } from "node:module";
 
 // qrcode-terminal adalah paket CommonJS tanpa default export di tipenya.
