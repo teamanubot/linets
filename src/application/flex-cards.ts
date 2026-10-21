@@ -40,7 +40,7 @@ export const CARD_STYLES = {
   struk: "daftar rincian rata kanan dengan baris total yang ditebalkan",
   pengumuman: "lencana berwarna, judul besar, isi, tombol",
   polos: "putih sederhana dengan tombol penuh",
-  latar: "latar bergerak (APNG) memenuhi kartu: navbar judul, bar bawah teks kredit + foto profilmu",
+  latar: "seluruh kartu = latar bergerak (APNG) + lapisan hitam transparan tipis; navbar judul, isi tengah, bar bawah kredit + foto profilmu",
 } as const;
 
 export type CardStyle = keyof typeof CARD_STYLES;
@@ -65,6 +65,12 @@ export interface CardInput {
   sub?: string;
   /** Rasio lebar:tinggi gambar latar (gaya `latar`), mis. "16:9"; default "1:1". */
   ratio?: string;
+  /** Opasitas lapisan hitam transparan di atas gambar latar (gaya `latar`), 0-80 persen; default 80. */
+  scrim?: number;
+  /** Ukuran teks isi tengah (gaya `latar`): xxs..xl; default lg. */
+  textSize?: string;
+  /** Perataan teks isi tengah (gaya `latar`): `start` = rata kiri; default `center`. */
+  textAlign?: "start" | "center";
   /** Pengirim untuk bar tanda tangan (nama dan foto profil), dipakai gaya `latar`. */
   author?: { name: string; pictureUrl?: string };
 }
@@ -89,7 +95,7 @@ interface Palette {
 
 const splitLines = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean);
 
-/** Dua kolom: label di kiri (abu-abu), nilai di kanan (rata kiri atau kanan). */
+/** Dua kolom: label di kiri (hitam transparan), nilai di kanan (rata kiri atau kanan). */
 function infoRow(label: string, value: string, palette: Palette, options: { valueAlign?: "start" | "end"; emphasize?: boolean } = {}): FlexNode {
   const { valueAlign = "start", emphasize = false } = options;
   return {
@@ -384,81 +390,90 @@ function avatarCircle(name: string, pictureUrl: string | undefined, size: string
 }
 
 /** Isi di tengah: setiap baris jadi teks rata tengah (baris "Label: nilai" ditulis apa adanya). */
-function centeredLines(text: string, color: string): FlexNode[] {
-  return splitLines(text).map((line) => textNode(line, { size: "lg", weight: "bold", align: "center", color, lineSpacing: "6px" }));
+function centeredLines(text: string, color: string, size = "lg", align: "start" | "center" = "center"): FlexNode[] {
+  // Baris kosong (dua kali enter) dipertahankan sebagai jarak antarbagian.
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .map((line) => (line ? textNode(line, { size, weight: "bold", align, color, lineSpacing: "6px" }) : box([{ type: "filler" }], { height: "10px" })));
+}
+
+const SCRIM_BASE = "#000000";
+export const DEFAULT_SCRIM_PERCENT = 80;
+
+/** Warna hitam dengan opasitas persentase tertentu (heksa 8 digit: RRGGBBAA). */
+function grayWithOpacity(percent: number): string {
+  const alpha = Math.round((Math.min(Math.max(percent, 0), 100) / 100) * 255);
+  return `${SCRIM_BASE}${alpha.toString(16).padStart(2, "0").toUpperCase()}`;
 }
 
 /**
- * Latar bergerak: navbar solid di atas berisi judul, gambar (APNG bergerak) memenuhi seluruh area tengah dengan isi teks di
- * tengahnya, dan bar bawah gelap berisi teks kredit di kiri dan foto profil pengirim di kanan. Isi `-` berarti tanpa teks
- * (gambar saja). Tanpa gambar, area tengah memakai gradien tema.
+ * Latar bergerak: SELURUH kartu adalah satu gambar (APNG bergerak). Di atasnya ada lapisan hitam transparan tipis, lalu tiga bagian teks:
+ * navbar di atas berisi judul, isi di tengah, dan bar bawah dengan teks kredit di kiri dan foto profil pengirim di kanan.
+ * Navbar dan bar bawah diberi lapisan hitam transparan tambahan agar terlihat sebagai bar, namun gambar tetap terlihat di bawahnya.
+ * Flex tidak punya gambar latar untuk header/footer, jadi semuanya disusun sebagai lapisan absolut di dalam body.
+ * Isi `-` berarti tanpa teks tengah. Tanpa gambar, latarnya gradien tema.
  */
 function latarCard(input: CardInput): FlexNode {
   const { title, text, imageUrl, label, sub, author, credit, buttonLabel, buttonUrl } = input;
   const theme = CARD_THEMES[input.theme ?? DEFAULT_THEME];
-  const onNavbar = { strong: "#FFFFFF", soft: "#FFFFFFCC" };
+  const scrim = input.scrim ?? DEFAULT_SCRIM_PERCENT;
+  const layer = grayWithOpacity(scrim);
+  const textColor = { strong: "#FFFFFF", soft: "#FFFFFFD9" };
   const body = text.trim() === "-" ? "" : text;
 
   const navbar: FlexNode[] = [];
-  if (label) navbar.push(textNode(label.toUpperCase(), { size: "xs", weight: "bold", align: "center", color: onNavbar.soft }));
-  navbar.push(textNode(title, { size: "lg", weight: "bold", align: "center", color: onNavbar.strong }));
-  if (sub) navbar.push(textNode(sub, { size: "xs", align: "center", color: onNavbar.soft }));
+  if (label) navbar.push(textNode(label.toUpperCase(), { size: "xs", weight: "bold", align: "center", color: textColor.soft }));
+  navbar.push(textNode(title, { size: "lg", weight: "bold", align: "center", color: textColor.strong }));
+  if (sub) navbar.push(textNode(sub, { size: "xs", align: "center", color: textColor.soft }));
 
-  const stage = imageUrl
-    ? box([
-        { type: "image", url: imageUrl, size: "full", aspectRatio: input.ratio ?? "1:1", aspectMode: "cover", animated: true },
-        ...(body
-          ? [
-              box(centeredLines(body, "#FFFFFF"), {
-                position: "absolute",
-                offsetTop: "0px",
-                offsetBottom: "0px",
-                offsetStart: "0px",
-                offsetEnd: "0px",
-                justifyContent: "center",
-                alignItems: "center",
-                paddingAll: "24px",
-                spacing: "sm",
-                backgroundColor: "#00000055",
-              }),
-            ]
-          : []),
-      ])
-    : box(centeredLines(body || title, theme.text), {
-        height: "280px",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingAll: "24px",
-        spacing: "sm",
-        background: { type: "linearGradient", angle: "0deg", startColor: theme.startColor, endColor: theme.endColor },
-      });
-
-  const footerContents: FlexNode[] = [];
+  const bottom: FlexNode[] = [];
   if (buttonLabel && buttonUrl) {
-    footerContents.push({ type: "button", style: "link", color: "#93C5FD", height: "sm", action: { type: "uri", label: buttonLabel, uri: buttonUrl } });
+    bottom.push({ type: "button", style: "link", color: "#DBEAFE", height: "sm", action: { type: "uri", label: buttonLabel, uri: buttonUrl } });
   }
   if (credit || author) {
-    footerContents.push({
+    bottom.push({
       type: "box",
       layout: "horizontal",
       spacing: "md",
       alignItems: "center",
       contents: [
-        textNode(credit ?? " ", { size: "xs", weight: "bold", color: "#D1D5DB", flex: 1, gravity: "center" }),
+        textNode(credit ?? " ", { size: "xs", weight: "bold", color: textColor.strong, flex: 1, gravity: "center" }),
         ...(author ? [avatarCircle(author.name, author.pictureUrl, "36px", { background: "#FFFFFF33", text: "#FFFFFF" })] : []),
       ],
     });
   }
 
-  const bubble: FlexNode = {
+  const middle = box(centeredLines(body, textColor.strong, input.textSize, input.textAlign), {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: input.textAlign === "start" ? "flex-start" : "center",
+    paddingAll: "16px",
+    spacing: "sm",
+    backgroundColor: layer,
+  });
+
+  const overlay = box(
+    [
+      box(navbar, { paddingAll: "14px", spacing: "xs", backgroundColor: layer }),
+      body ? middle : box([{ type: "filler" }], { flex: 1, backgroundColor: layer }),
+      ...(bottom.length > 0 ? [box(bottom, { paddingAll: "12px", spacing: "sm", backgroundColor: layer })] : []),
+    ],
+    { position: "absolute", offsetTop: "0px", offsetBottom: "0px", offsetStart: "0px", offsetEnd: "0px", justifyContent: "space-between" },
+  );
+
+  const backdrop: FlexNode = imageUrl
+    ? { type: "image", url: imageUrl, size: "full", aspectRatio: input.ratio ?? "1:1", aspectMode: "cover", animated: true }
+    : box([{ type: "filler" }], {
+        height: "320px",
+        background: { type: "linearGradient", angle: "0deg", startColor: theme.startColor, endColor: theme.endColor },
+      });
+
+  return {
     type: "bubble",
     size: "mega",
-    header: box(navbar, { paddingAll: "14px", spacing: "xs", backgroundColor: theme.solid }),
-    body: box([stage], { paddingAll: "0px" }),
-    styles: { footer: { backgroundColor: "#111827" } },
+    body: box([box([backdrop, overlay])], { paddingAll: "0px" }),
   };
-  if (footerContents.length > 0) bubble.footer = box(footerContents, { paddingAll: "12px", spacing: "sm" });
-  return bubble;
 }
 
 const BUILDERS: Record<CardStyle, (input: CardInput) => FlexNode> = {

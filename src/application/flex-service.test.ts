@@ -27,6 +27,26 @@ describe("FlexService", () => {
 
   const withLiff = async () => service.configureLiff(LIFF, new FakeMessage());
 
+  it("tab help: kartu latar bila LIFF diatur; teks biasa bila LIFF kosong atau kirim gagal", async () => {
+    const card = { title: "Menu", label: "Bot", sub: "s", text: "a\nb" };
+
+    const plain = new FakeMessage();
+    await service.sendHelp(card, "TEKS BANTUAN", plain);
+    assert.deepEqual(plain.replies, ["TEKS BANTUAN"]); // LIFF belum diatur
+    assert.equal(sender.sent.length, 0);
+
+    await withLiff();
+    const sentOk = new FakeMessage();
+    await service.sendHelp(card, "TEKS BANTUAN", sentOk);
+    assert.deepEqual(sentOk.replies, []);
+    assert.match(JSON.stringify(sender.sent[0]!.contents), /latar-flex\.png.*"animated":true|"animated":true.*latar-flex\.png/);
+
+    sender.send = async () => Promise.reject(new Error("ditolak"));
+    const failed = new FakeMessage();
+    await service.sendHelp(card, "TEKS BANTUAN", failed);
+    assert.deepEqual(failed.replies, ["TEKS BANTUAN"]);
+  });
+
   it("tab liff: tampilkan status, atur id, validasi format, dan reset", async () => {
     const status = new FakeMessage();
     await service.configureLiff("", status);
@@ -270,7 +290,7 @@ describe("FlexService: gaya, pratinjau, galeri", () => {
     assert.equal(sender.sent.length, 0);
   });
 
-  it("gaya latar: bar bawah memakai nama dan foto profil dari penyedia identitas; opsi gif/latar = gambar", async () => {
+  it("gaya latar: bar bawah memakai foto tab.jpeg; opsi gif/latar = gambar", async () => {
     const identity = { current: async () => ({ name: "Rmun", pictureUrl: "https://profile.line-scdn.net/xyz" }) };
     service = new FlexService({ sender, store, pauseMs: 0, identity });
     await service.init();
@@ -280,7 +300,8 @@ describe("FlexService: gaya, pratinjau, galeri", () => {
     const first = JSON.stringify(sender.sent[0]!.contents);
     assert.match(first, /"animated":true/);
     assert.match(first, /https:\/\/a\.id\/x\.gif/);
-    assert.match(first, /https:\/\/profile\.line-scdn\.net\/xyz/);
+    assert.match(first, /https:\/\/raw\.githubusercontent\.com\/teamanubot\/linets\/main\/assets\/tab\.jpeg/); // foto bar bawah = tab.jpeg
+    assert.doesNotMatch(first, /profile\.line-scdn\.net/);
     assert.match(first, /"text":"Powered By TeamAnuBot"/); // teks kredit bawaan di kiri bar bawah
     assert.match(JSON.stringify(sender.sent[1]!.contents), /https:\/\/a\.id\/y\.gif/);
   });
@@ -351,15 +372,14 @@ describe("FlexService: gaya, pratinjau, galeri", () => {
     assert.equal(sender.sent.length, 5); // semua tetap terkirim
   });
 
-  it("gaya latar: gagal mengambil identitas tidak membatalkan kirim (bar bawah tanpa foto)", async () => {
+  it("gaya latar: gagal mengambil identitas tidak membatalkan kirim (foto tetap tab.jpeg)", async () => {
     const identity = { current: async () => Promise.reject(new Error("offline")) };
     service = new FlexService({ sender, store, pauseMs: 0, identity });
     await service.init();
     await service.sendCard("Judul | Isi | gaya:latar | gif:https://a.id/x.gif", new FakeMessage());
 
     assert.equal(sender.sent.length, 1);
-    const bar = (sender.sent[0]!.contents as { footer: { contents: Array<{ contents: unknown[] }> } }).footer.contents[0]!;
-    assert.equal(bar.contents.length, 1); // hanya teks kredit, tanpa foto profil
+    assert.match(JSON.stringify(sender.sent[0]!.contents), /assets\/tab\.jpeg/);
   });
 
   it("gaya selain latar tidak memanggil penyedia identitas", async () => {

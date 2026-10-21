@@ -204,28 +204,36 @@ describe("gaya latar", () => {
   const author = { name: "Rmun", pictureUrl: "https://profile.line-scdn.net/abc" };
   const credit = "Powered By TeamAnuBot";
 
-  it("navbar solid berisi judul, gambar memenuhi area tengah (animated) dengan isi di tengah, bar bawah: kredit kiri + foto kanan", () => {
+  it("seluruh kartu = gambar bergerak + lapisan hitam; navbar judul, isi tengah, bar bawah kredit kiri + foto kanan", () => {
     const card: Node = buildCard({ title: "Selamat Pagi", text: "Semangat!\nTerus ya", style: "latar", theme: "biru", imageUrl: "https://a.id/x.png", author, credit, sub: "Hari baru", label: "Sapaan" });
 
-    assert.equal(card.header.backgroundColor, CARD_THEMES.biru.solid);
-    assert.deepEqual(card.header.contents.map((item: Node) => item.text), ["SAPAAN", "Selamat Pagi", "Hari baru"]);
-    assert.equal(card.header.contents[1].color, "#FFFFFF");
-    assert.equal(card.body.paddingAll, "0px"); // tanpa jarak: gambar full
+    assert.equal("header" in card, false);
+    assert.equal("footer" in card, false);
+    assert.equal(card.body.paddingAll, "0px");
 
     const [image, overlay] = card.body.contents[0].contents as Node[];
     assert.deepEqual({ url: image!.url, animated: image!.animated, mode: image!.aspectMode, size: image!.size }, { url: "https://a.id/x.png", animated: true, mode: "cover", size: "full" });
     assert.equal(overlay!.position, "absolute");
     assert.deepEqual([overlay!.offsetTop, overlay!.offsetBottom, overlay!.offsetStart, overlay!.offsetEnd], ["0px", "0px", "0px", "0px"]);
-    assert.deepEqual([overlay!.justifyContent, overlay!.alignItems], ["center", "center"]);
-    assert.deepEqual(overlay!.contents.map((item: Node) => [item.text, item.align]), [["Semangat!", "center"], ["Terus ya", "center"]]);
 
-    const bar = card.footer.contents[0];
-    assert.equal(card.styles.footer.backgroundColor, "#111827");
+    const [navbar, middle, bottom] = overlay!.contents as Node[];
+    assert.deepEqual(navbar!.contents.map((item: Node) => item.text), ["SAPAAN", "Selamat Pagi", "Hari baru"]);
+    assert.equal(navbar!.backgroundColor, "#000000CC"); // navbar, tengah, dan bar bawah sama-sama dilapisi hitam 80%
+    assert.equal(middle!.backgroundColor, "#000000CC");
+    assert.deepEqual(middle!.contents.map((item: Node) => [item.text, item.align]), [["Semangat!", "center"], ["Terus ya", "center"]]);
+
+    const bar = bottom!.contents[0];
+    assert.equal(bottom!.backgroundColor, "#000000CC");
     assert.equal(bar.layout, "horizontal");
-    assert.deepEqual({ text: bar.contents[0].text, flex: bar.contents[0].flex }, { text: credit, flex: 1 }); // kiri
-    assert.equal(bar.contents[1].cornerRadius, "18px"); // kanan: foto bulat
+    assert.deepEqual({ text: bar.contents[0].text, flex: bar.contents[0].flex }, { text: credit, flex: 1 });
+    assert.equal(bar.contents[1].cornerRadius, "18px");
     assert.equal(bar.contents[1].contents[0].url, author.pictureUrl);
-    assert.equal(bar.contents.length, 2); // tidak ada teks nama
+    assert.equal(bar.contents.length, 2);
+  });
+
+  it("opasitas lapisan hitam bisa diatur", () => {
+    const card: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png", scrim: 40 });
+    assert.equal(card.body.contents[0].contents[1].contents[0].backgroundColor, "#00000066");
   });
 
   it("rasio gambar bisa diatur (default 1:1) untuk GIF landscape", () => {
@@ -236,35 +244,32 @@ describe("gaya latar", () => {
     assert.equal(square.body.contents[0].contents[0].aspectRatio, "1:1");
   });
 
-  it("isi '-' berarti gambar saja tanpa teks dan tanpa lapisan gelap", () => {
+  it("isi '-' berarti tanpa teks tengah (navbar dan bar bawah tetap ada)", () => {
     const card: Node = buildCard({ title: "T", text: "-", style: "latar", imageUrl: "https://a.id/x.png", author, credit });
-    assert.equal(card.body.contents[0].contents.length, 1);
-    assert.equal(card.body.contents[0].contents[0].type, "image");
+    const overlay = card.body.contents[0].contents[1];
+    assert.deepEqual(overlay.contents.map((item: Node) => item.type), ["box", "box", "box"]);
   });
 
   it("tanpa foto profil: avatar inisial; tanpa pengirim: hanya teks kredit; tanpa keduanya: tanpa bar bawah", () => {
+    const bottomOf = (card: Node) => card.body.contents[0].contents[1].contents[2];
     const initial: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png", author: { name: "budi" }, credit });
-    assert.equal(initial.footer.contents[0].contents[1].contents[0].text, "B");
+    assert.equal(bottomOf(initial).contents[0].contents[1].contents[0].text, "B");
 
     const creditOnly: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png", credit });
-    assert.equal(creditOnly.footer.contents[0].contents.length, 1);
+    assert.equal(bottomOf(creditOnly).contents[0].contents.length, 1);
 
     const none: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png" });
-    assert.equal("footer" in none, false);
+    assert.equal(bottomOf(none), undefined);
   });
 
-  it("tanpa gambar: area tengah memakai gradien tema dengan isi di tengah", () => {
+  it("tanpa gambar: latar memakai gradien tema", () => {
     const card: Node = buildCard({ title: "T", text: "Isi", style: "latar", theme: "biru", author, credit });
-    const stage = card.body.contents[0];
-
-    assert.equal(stage.background.type, "linearGradient");
-    assert.equal(stage.justifyContent, "center");
-    assert.equal(stage.contents[0].align, "center");
+    assert.equal(card.body.contents[0].contents[0].background.type, "linearGradient");
   });
 
-  it("tombol (jika ada) tampil di footer di atas bar kredit/foto", () => {
+  it("tombol (jika ada) tampil di bar bawah di atas baris kredit/foto", () => {
     const card: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png", author, credit, buttonLabel: "Buka", buttonUrl: "https://line.me" });
-    assert.deepEqual(card.footer.contents.map((item: Node) => item.type), ["button", "box"]);
+    assert.deepEqual(card.body.contents[0].contents[1].contents[2].contents.map((item: Node) => item.type), ["button", "box"]);
   });
 });
 

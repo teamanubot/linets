@@ -9,7 +9,7 @@ import type { FlexService } from "../application/flex-service.ts";
 import type { MediaSaver } from "../application/media-saver.ts";
 import type { FlowName, ProfileFlow } from "../application/profile-flow.ts";
 import type { ChatMessage } from "../domain/chat.ts";
-import { renderHelp } from "./help.ts";
+import { helpCard, renderHelp } from "./help.ts";
 
 export const COMMAND_PREFIX = "tab";
 
@@ -51,7 +51,7 @@ export function createCommands({
   displayName,
 }: CommandDeps): Record<string, Command> {
   return {
-    help: (args, message) => message.reply(renderHelp(args)),
+    help: (args, message) => flex.sendHelp(helpCard(args), renderHelp(args), message),
     ping: (_args, message) => message.reply("pong 🏓"),
     speed: (_args, message) => speedTest.run(message),
     echo: (args, message) => message.reply(args || "(kosong)"),

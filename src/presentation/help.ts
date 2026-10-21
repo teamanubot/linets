@@ -173,3 +173,30 @@ export function renderHelp(topic = ""): string {
   const section = HELP_SECTIONS.find((candidate) => candidate.key === wanted);
   return section ? renderTopic(section) : renderMenu(`❓ Topik "${topic.trim()}" tidak ada.`);
 }
+
+export interface HelpCard {
+  title: string;
+  label: string;
+  sub: string;
+  /** Baris isi kartu (Flex `latar`), tengah-rata. */
+  text: string;
+}
+
+/** Versi ringkas bantuan untuk kartu Flex: menu utama (perintah per bagian) atau satu topik. */
+export function helpCard(topic = ""): HelpCard {
+  const section = HELP_SECTIONS.find((candidate) => candidate.key === topic.trim().toLowerCase());
+  if (section) {
+    return {
+      title: `${section.icon} ${section.title}`,
+      label: "Bantuan",
+      sub: `${COMMAND_PREFIX} help untuk menu utama`,
+      text: section.items.map(formatItem).join("\n"),
+    };
+  }
+  return {
+    title: "🤖 Menu Bot LINE",
+    label: "TeamAnuBot",
+    sub: `Awali perintah dengan "${COMMAND_PREFIX}"`,
+    text: HELP_SECTIONS.map((item) => `${item.icon} ${item.title}\n${item.items.map((entry) => entry.usage.split(" ")[0]).join(" · ")}`).join("\n\n") + `\n\n💡 Detail: ${COMMAND_PREFIX} help <profil | cover | grup | otomatis>`,
+  };
+}

@@ -65,7 +65,27 @@ const isHttpsUrl = (value: string) => /^https:\/\/\S+$/i.test(value);
 const isStyle = (value: string): value is CardStyle => (STYLE_NAMES as string[]).includes(value);
 const isTheme = (value: string): value is CardThemeName => (THEME_NAMES as string[]).includes(value);
 
-const OPTION_PATTERN = /^(tema|gambar|latar|gif|gaya|oleh|label|sub|tombol2|rasio)\s*:\s*(.+)$/is;
+/** Foto bulat di bar bawah kartu `latar`: gambar milik TeamAnuBot, bukan foto profil LINE. */
+const AVATAR_URL = "https://raw.githubusercontent.com/teamanubot/linets/main/assets/tab.jpeg";
+
+/** Latar bergerak kartu bantuan (APNG di repo TeamAnuBot; URL terkunci ke commit karena cache raw/main bisa menyajikan versi lama 897 KB yang tidak bergerak). */
+const HELP_BACKGROUND_URL = "https://raw.githubusercontent.com/teamanubot/linets/aef7c7e/assets/latar-flex.png";
+
+/**
+ * Kartu `latar` setinggi gambarnya, jadi teks panjang butuh gambar lebih tinggi (batas Flex: tinggi maks. 3x lebar).
+ * Tinggi diperkirakan dari jumlah baris (dengan baris yang terlipat) ditambah navbar dan bar bawah.
+ */
+function helpRatio(text: string): string {
+  const WIDTH = 300;
+  const CHARS_PER_LINE = 48;
+  const LINE_HEIGHT = 19;
+  const CHROME = 190;
+  const lines = text.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE)), 0);
+  const height = Math.min(CHROME + lines * LINE_HEIGHT, 3 * WIDTH);
+  return `${WIDTH}:${height}`;
+}
+
+const OPTION_PATTERN = /^(tema|gambar|latar|gif|gaya|oleh|label|sub|tombol2|rasio|opasitas)\s*:\s*(.+)$/is;
 
 /** Rasio gambar "lebar:tinggi" (Flex: tinggi maksimal 3x lebar). */
 function parseRatio(value: string): string | null {
@@ -89,7 +109,7 @@ function splitOptions(parts: string[]): { positional: string[]; options: Record<
 
 const FLEX_USAGE =
   "Pakai: tab flex <judul> | <isi> [| <label tombol> | <link https>] [| gaya:chino] [| tema:pink] [| gambar:https://...] " +
-  "[| label:Teks] [| sub:Teks] [| oleh:Nama] [| rasio:16:9] [| tombol2:Label>https://...]\n" +
+  "[| label:Teks] [| sub:Teks] [| oleh:Nama] [| rasio:16:9] [| opasitas:50] [| tombol2:Label>https://...]\n" +
   `Gaya: ${STYLE_NAMES.join(", ")}\nTema: ${THEME_NAMES.join(", ")}\n` +
   'Baris isi berbentuk "Label: nilai" tampil sebagai dua kolom. Lihat contoh semua gaya: tab flexgaya contoh';
 
@@ -208,7 +228,12 @@ export class FlexService {
     if (options.sub && options.sub.length > MAX_SUB_LENGTH) return message.reply(`Teks "sub" maks. ${MAX_SUB_LENGTH} huruf.`);
 
     const ratio = options.rasio === undefined ? undefined : parseRatio(options.rasio);
-    if (options.rasio !== undefined && !ratio) return message.reply("Format rasio: rasio:16:9 (lebar:tinggi, tinggi maks. 3x lebar).");
+    if (options.rasio !== undefined && !ratio) return message.reply(`Format rasio: rasio:16:9 (lebar:tinggi, tinggi maks. 3x lebar). Yang terbaca: "${options.rasio}"`);
+
+    const scrim = options.opasitas === undefined ? undefined : Number(options.opasitas.replace("%", "").trim());
+    if (scrim !== undefined && !(Number.isInteger(scrim) && scrim >= 0 && scrim <= 80)) {
+      return message.reply("Format opasitas: opasitas:50 (angka bulat 0–80, persen lapisan hitam di atas gambar latar).");
+    }
 
     let button2Label: string | undefined;
     let button2Url: string | undefined;
@@ -232,6 +257,7 @@ export class FlexService {
       style,
       imageUrl,
       ratio: ratio ?? undefined,
+      scrim,
       credit: options.oleh ?? (style === "latar" ? this.settings.flex.credit : undefined),
       label: options.label,
       sub: options.sub,
@@ -319,9 +345,35 @@ export class FlexService {
   /** Nama dan foto profil sendiri; gagal mengambil tidak membatalkan kirim (bar bawah dilewati). */
   private async author(): Promise<{ name: string; pictureUrl?: string } | undefined> {
     try {
-      return await this.deps.identity?.current();
+      const identity = await this.deps.identity?.current();
+      return { name: identity?.name ?? "TeamAnuBot", pictureUrl: AVATAR_URL };
     } catch {
-      return undefined;
+      return { name: "TeamAnuBot", pictureUrl: AVATAR_URL };
+    }
+  }
+
+  /**
+   * `tab help` sebagai kartu `latar`. Bila LIFF belum diatur atau kirim Flex gagal, jatuh ke teks biasa
+   * supaya bantuan selalu terbaca.
+   */
+  async sendHelp(card: { title: string; label: string; sub: string; text: string }, fallback: string, message: ChatMessage): Promise<void> {
+    const liffId = this.settings.liff.id;
+    if (!liffId) return message.reply(fallback);
+    try {
+      const contents = buildCard({
+        ...card,
+        style: "latar",
+        theme: this.defaultTheme,
+        imageUrl: HELP_BACKGROUND_URL,
+        ratio: helpRatio(card.text),
+        textSize: "xs",
+        textAlign: "start",
+        credit: this.settings.flex.credit,
+        author: await this.author(),
+      });
+      await this.deps.sender.send(message.chatId, liffId, card.title, contents);
+    } catch {
+      await message.reply(fallback);
     }
   }
 
