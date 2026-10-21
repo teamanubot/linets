@@ -27,6 +27,7 @@ import { LineProfileGateway } from "./infrastructure/line/line-profile-gateway.t
 import { createConsoleLogger } from "./presentation/logger.ts";
 import { LoggingMediaSender, LoggingNotifier } from "./presentation/logging-decorators.ts";
 import { startLineBot } from "./presentation/line-bot.ts";
+// Versi ini TIDAK menyertakan GroupGuard (proteksi anti-kick-massal). Pakai `main-proteksi.ts` untuk itu.
 
 await removeStaleDownloads();
 const logger = createConsoleLogger();

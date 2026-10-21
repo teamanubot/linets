@@ -164,7 +164,7 @@ describe("FlexService", () => {
   });
 
   it("pengaturan LIFF dimuat dari penyimpanan saat init", async () => {
-    const saved = new FakeSettingsStore({ autoReply: { enabled: false, text: "" }, antiUnsend: { enabled: true }, liff: { id: LIFF }, flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" } });
+    const saved = new FakeSettingsStore({ autoReply: { enabled: false, text: "" }, antiUnsend: { enabled: true }, liff: { id: LIFF }, flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" }, groupGuard: { enabled: true } });
     const loaded = new FlexService({ sender, store: saved });
     await loaded.init();
     await loaded.sendCard("J | I", new FakeMessage());

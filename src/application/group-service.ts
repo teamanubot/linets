@@ -67,6 +67,26 @@ export class GroupService {
     await this.groups.leave(message.chatId);
   }
 
+  /**
+   * Perintah `tab kickall`: langsung keluarkan semua anggota grup ini (kecuali pemilik akun sendiri) selama
+   * akun ini memang admin/punya izin mengeluarkan orang di grup tersebut. Hanya untuk grup milikmu sendiri
+   * yang memang ingin kamu bubarkan; bukan cara memasuki atau mengambil alih grup orang lain. Tanpa
+   * konfirmasi tambahan — pastikan kamu memang di grup yang benar sebelum mengetiknya.
+   */
+  async kickAll(_args: string, message: ChatMessage): Promise<void> {
+    if (!(await this.requireGroup(message))) return;
+    await message.reply("Mengeluarkan semua anggota grup...");
+    const members = await this.groups.members(message.chatId);
+    const targets = members.filter((id) => id !== this.selfId);
+    if (targets.length === 0) return message.reply("Tidak ada anggota lain untuk dikeluarkan.");
+    try {
+      await this.groups.kick(message.chatId, targets);
+      await message.reply(`✅ Selesai. Target: ${targets.length} orang (sebagian mungkin gagal kalau akunmu bukan admin; cek daftar anggota grup untuk memastikan).`);
+    } catch (error) {
+      await message.reply(`❌ Gagal mengeluarkan siapa pun (mungkin akunmu bukan admin di grup ini): ${(error as Error).message}`);
+    }
+  }
+
   private async requireGroup(message: ChatMessage): Promise<boolean> {
     if (message.isGroupChat) return true;
     await message.reply("Perintah ini hanya bisa dipakai di chat grup.");

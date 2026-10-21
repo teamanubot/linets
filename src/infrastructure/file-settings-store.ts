@@ -13,6 +13,7 @@ export class FileSettingsStore implements SettingsStore {
         antiUnsend: { ...DEFAULT_SETTINGS.antiUnsend, ...saved.antiUnsend },
         liff: { ...DEFAULT_SETTINGS.liff, ...saved.liff },
         flex: { ...DEFAULT_SETTINGS.flex, ...saved.flex },
+        groupGuard: { ...DEFAULT_SETTINGS.groupGuard, ...saved.groupGuard },
       };
     } catch {
       return structuredClone(DEFAULT_SETTINGS);

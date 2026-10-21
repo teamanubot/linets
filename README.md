@@ -261,9 +261,22 @@ src/
   application/     logika: alur foto profil, akun, grup, simpan media + unit test
   infrastructure/  LINE (login, OBS, adapter pesan) dan ffmpeg
   presentation/    parser perintah "tab ..." dan event handler bot
-  main.ts          titik masuk (merakit semua bagian)
+  main.ts          titik masuk TANPA Group Guard
+  main-proteksi.ts titik masuk DENGAN Group Guard (proteksi anti-kick-massal, tab groupguard)
+  start.ts         dijalankan oleh `npm start`; pilih salah satu di atas (lihat di bawah)
 scripts/           tes live manual
 ```
+
+### `npm start`: dengan atau tanpa Group Guard
+
+`npm start` menjalankan `src/start.ts`, yang memilih salah satu titik masuk:
+
+- Kalau `src/main-proteksi.ts` **ada**, kamu ditanya di terminal: "Pakai Group Guard (proteksi anti-kick-massal)?" — jawab `y`/`n`.
+- Kalau filenya **tidak ada** (mis. sengaja dihapus), bot langsung jalan **tanpa** Group Guard, tanpa ditanya.
+
+File yang terlibat untuk Group Guard: `src/application/group-guard-proteksi.ts`, `src/presentation/commands-proteksi.ts`,
+`src/presentation/help-proteksi.ts`, `src/presentation/line-bot-proteksi.ts`, `src/main-proteksi.ts`. Menghapus
+file-file itu (minimal `src/main-proteksi.ts`) membuat bot jalan tanpa fitur `tab groupguard` sama sekali.
 
 Library LINE yang dipakai adalah `@tab/linets` (fork LINEJS, MIT) dari
 [JSR](https://jsr.io/@tab/linets). `.npmrc` di project ini mengarahkan scope `@jsr` ke `https://npm.jsr.io`,

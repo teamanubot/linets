@@ -4,10 +4,22 @@ import type { LineMessageResolver } from "./line-message-resolver.ts";
 
 const DOWNLOAD_ATTEMPTS = 30;
 const DOWNLOAD_RETRY_MS = 1500;
+// Beri waktu kunci E2EE baru dipakai di sisi server/perangkat lain sebelum kirim ulang, supaya pesan
+// yang dikirim segera setelah kunci didaftarkan ulang tidak muncul "tidak dapat ditampilkan" di penerima.
+const GROUP_KEY_PROPAGATION_DELAY_MS = 1000;
 
 function requiresE2ee(error: unknown): boolean {
   const code = (error as { data?: { code?: string } } | null)?.data?.code;
   return code === "E2EE_RETRY_ENCRYPT" || String(error).includes("E2EE_RETRY_ENCRYPT");
+}
+
+/**
+ * Terjadi setelah keanggotaan grup berubah banyak sekaligus (mis. `tab kickall`): kunci E2EE grup lama
+ * tidak cocok lagi dengan anggota yang tersisa, sampai didaftarkan ulang lewat `tryRegisterE2EEGroupKey`.
+ */
+function needsGroupKeyRecreate(error: unknown): boolean {
+  const code = (error as { data?: { code?: string } } | null)?.data?.code;
+  return code === "E2EE_RECREATE_GROUP_KEY" || String(error).includes("E2EE_RECREATE_GROUP_KEY");
 }
 
 /** Membungkus TalkMessage dari LINEJS sebagai ChatMessage. */
@@ -15,6 +27,7 @@ export class LineChatMessage implements ChatMessage {
   constructor(
     private readonly message: TalkMessage,
     private readonly resolver: LineMessageResolver,
+    private readonly groupKeyPropagationDelayMs = GROUP_KEY_PROPAGATION_DELAY_MS,
   ) {}
 
   get id(): string {
@@ -56,7 +69,7 @@ export class LineChatMessage implements ChatMessage {
     const target = this.message.getReplyTarget();
     if (!target) return null;
     const resolved = await this.resolver.resolve(target.id, this.chatId);
-    return resolved ? new LineChatMessage(resolved, this.resolver) : null;
+    return resolved ? new LineChatMessage(resolved, this.resolver, this.groupKeyPropagationDelayMs) : null;
   }
 
   /**
@@ -67,6 +80,14 @@ export class LineChatMessage implements ChatMessage {
     try {
       await this.message.reply(text);
     } catch (error) {
+      if (needsGroupKeyRecreate(error)) {
+        await this.resolver.getClient().base.e2ee.tryRegisterE2EEGroupKey(this.chatId);
+        // Kirim ulang dengan cara yang sama seperti semula (bukan memaksa e2ee:true) — memaksa E2EE di sini
+        // pernah membuat pesannya muncul "tidak dapat ditampilkan" di penerima, mungkin karena kunci yang
+        // baru didaftarkan belum sempat dipakai semua perangkat/sesi. Jeda sebentar dulu sebelum kirim ulang.
+        await new Promise((resolve) => setTimeout(resolve, this.groupKeyPropagationDelayMs));
+        return void (await this.message.reply(text));
+      }
       if (!requiresE2ee(error)) throw error;
       await this.message.reply({ text, e2ee: true });
     }

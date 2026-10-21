@@ -1,12 +1,12 @@
 import { COMMAND_PREFIX } from "./commands.ts";
 
-interface HelpItem {
+export interface HelpItem {
   /** Perintah tanpa awalan, mis. "nama <nama>". */
   usage: string;
   summary: string;
 }
 
-interface HelpSection {
+export interface HelpSection {
   key: string;
   icon: string;
   title: string;
@@ -69,13 +69,15 @@ export const HELP_SECTIONS: HelpSection[] = [
       { usage: "namagrup <nama>", summary: "ganti nama grup" },
       { usage: "invite @teman", summary: "undang ke grup" },
       { usage: "tendang @orang", summary: "keluarkan dari grup" },
+      { usage: "kickall", summary: "keluarkan SEMUA anggota (bubarkan grup ini)" },
       { usage: "keluar", summary: "keluar dari grup" },
     ],
     guide: [
       "Semua kecuali join dipakai langsung di chat grupnya.",
       "linkgrup → membuat link baru, link lama tidak berlaku lagi.",
       "invite / tendang → mention orangnya (@nama). invite juga bisa pakai id pengguna.",
-      "tendang butuh hak admin grup.",
+      "tendang / kickall butuh hak admin grup.",
+      "kickall → langsung mengeluarkan semua anggota grup ini (kecuali kamu), tanpa konfirmasi. Untuk grup milikmu sendiri yang mau dibubarkan — pastikan grupnya benar sebelum mengetik.",
       "keluar → minta konfirmasi, ketik: tab keluar ya",
     ],
   },
@@ -144,14 +146,12 @@ const LINE = "━━━━━━━━━━━━━━━━━━";
 
 const formatItem = ({ usage, summary }: HelpItem) => `• ${COMMAND_PREFIX} ${usage} — ${summary}`;
 
-function renderMenu(note?: string): string {
-  const sections = HELP_SECTIONS.map(
-    (section) => `${section.icon} ${section.title}\n${section.items.map(formatItem).join("\n")}`,
-  );
+function renderMenuFor(sections: HelpSection[], note?: string): string {
+  const rendered = sections.map((section) => `${section.icon} ${section.title}\n${section.items.map(formatItem).join("\n")}`);
   return [
     `🤖 MENU BOT LINE\n${LINE}\nAwali perintah dengan "${COMMAND_PREFIX}"`,
     ...(note ? [note] : []),
-    sections.join("\n\n"),
+    rendered.join("\n\n"),
     `${LINE}\n💡 Detail: ${COMMAND_PREFIX} help <profil | cover | grup | otomatis>`,
   ].join("\n\n");
 }
@@ -165,13 +165,18 @@ function renderTopic(section: HelpSection): string {
   ].join("\n\n");
 }
 
+/** Sama seperti `renderHelp`, tapi memakai daftar bagian bantuan apa pun (dipakai juga oleh `help-proteksi.ts`). */
+export function renderHelpFor(sections: HelpSection[], topic = ""): string {
+  const wanted = topic.trim().toLowerCase();
+  if (!wanted) return renderMenuFor(sections);
+
+  const section = sections.find((candidate) => candidate.key === wanted);
+  return section ? renderTopic(section) : renderMenuFor(sections, `❓ Topik "${topic.trim()}" tidak ada.`);
+}
+
 /** Teks bantuan: menu utama, atau detail satu topik (`tab help cover`). */
 export function renderHelp(topic = ""): string {
-  const wanted = topic.trim().toLowerCase();
-  if (!wanted) return renderMenu();
-
-  const section = HELP_SECTIONS.find((candidate) => candidate.key === wanted);
-  return section ? renderTopic(section) : renderMenu(`❓ Topik "${topic.trim()}" tidak ada.`);
+  return renderHelpFor(HELP_SECTIONS, topic);
 }
 
 export interface HelpCard {
@@ -182,9 +187,9 @@ export interface HelpCard {
   text: string;
 }
 
-/** Versi ringkas bantuan untuk kartu Flex: menu utama (perintah per bagian) atau satu topik. */
-export function helpCard(topic = ""): HelpCard {
-  const section = HELP_SECTIONS.find((candidate) => candidate.key === topic.trim().toLowerCase());
+/** Sama seperti `helpCard`, tapi memakai daftar bagian bantuan apa pun (dipakai juga oleh `help-proteksi.ts`). */
+export function helpCardFor(sections: HelpSection[], topic = ""): HelpCard {
+  const section = sections.find((candidate) => candidate.key === topic.trim().toLowerCase());
   if (section) {
     return {
       title: `${section.icon} ${section.title}`,
@@ -197,6 +202,11 @@ export function helpCard(topic = ""): HelpCard {
     title: "🤖 Menu Bot LINE",
     label: "TeamAnuBot",
     sub: `Awali perintah dengan "${COMMAND_PREFIX}"`,
-    text: HELP_SECTIONS.map((item) => `${item.icon} ${item.title}\n${item.items.map((entry) => entry.usage.split(" ")[0]).join(" · ")}`).join("\n\n") + `\n\n💡 Detail: ${COMMAND_PREFIX} help <profil | cover | grup | otomatis>`,
+    text: sections.map((item) => `${item.icon} ${item.title}\n${item.items.map((entry) => entry.usage.split(" ")[0]).join(" · ")}`).join("\n\n") + `\n\n💡 Detail: ${COMMAND_PREFIX} help <profil | cover | grup | otomatis>`,
   };
+}
+
+/** Versi ringkas bantuan untuk kartu Flex: menu utama (perintah per bagian) atau satu topik. */
+export function helpCard(topic = ""): HelpCard {
+  return helpCardFor(HELP_SECTIONS, topic);
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/main.ts",
   "scripts": {
-    "start": "tsx src/main.ts",
+    "start": "tsx src/start.ts",
     "typecheck": "tsc",
     "test": "tsx --test $(find src -name '*.test.ts')"
   },

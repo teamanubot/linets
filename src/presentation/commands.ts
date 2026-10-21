@@ -78,6 +78,7 @@ export function createCommands({
     invite: (args, message) => groups.invite(args, message),
     tendang: (_args, message) => groups.kick(message),
     keluar: (args, message) => groups.leave(args, message),
+    kickall: (_args, message) => groups.kickAll(_args, message),
     autoreply: (args, message) => autoReply.configure(args, message),
     antiunsend: (args, message) => antiUnsend.configure(args, message),
     batal: async (_args, message) => {

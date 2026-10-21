@@ -33,6 +33,7 @@ export class FakeProfile implements ProfileGateway {
 
 export class FakeGroups implements GroupGateway {
   calls: string[] = [];
+  groupMembers: Record<string, string[]> = {};
 
   async createInviteLink(chatId: string) {
     this.calls.push(`createInviteLink:${chatId}`);
@@ -53,6 +54,10 @@ export class FakeGroups implements GroupGateway {
   }
   async leave(chatId: string) {
     this.calls.push(`leave:${chatId}`);
+  }
+  async members(chatId: string) {
+    this.calls.push(`members:${chatId}`);
+    return this.groupMembers[chatId] ?? [];
   }
 }
 

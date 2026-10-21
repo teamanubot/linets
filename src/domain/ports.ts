@@ -55,6 +55,8 @@ export interface GroupGateway {
   invite(chatId: string, userIds: string[]): Promise<void>;
   kick(chatId: string, userIds: string[]): Promise<void>;
   leave(chatId: string): Promise<void>;
+  /** Id semua anggota grup (termasuk pemilik akun sendiri). */
+  members(chatId: string): Promise<string[]>;
 }
 
 /** Penyimpanan media yang diunduh (diimplementasikan oleh infrastructure). */
@@ -71,6 +73,8 @@ export interface BotSettings {
   liff: { id: string };
   /** Gaya dan tema bawaan kartu Flex (nama gaya/tema divalidasi oleh aplikasi). */
   flex: { style: string; theme: string; /** Teks kiri bar bawah gaya `latar`. */ credit: string };
+  /** Deteksi kick massal (serangan bot jahat) di grup; lihat [[GroupGuard]]. */
+  groupGuard: { enabled: boolean };
 }
 
 export const DEFAULT_SETTINGS: BotSettings = {
@@ -78,6 +82,7 @@ export const DEFAULT_SETTINGS: BotSettings = {
   antiUnsend: { enabled: true },
   liff: { id: "" },
   flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" },
+  groupGuard: { enabled: true },
 };
 
 export interface SettingsStore {

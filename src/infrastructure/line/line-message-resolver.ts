@@ -13,6 +13,11 @@ export class LineMessageResolver {
 
   constructor(private readonly client: Client) {}
 
+  /** Expose client-nya; dipakai LineChatMessage untuk mendaftar ulang kunci E2EE grup kalau perlu. */
+  getClient(): Client {
+    return this.client;
+  }
+
   remember(message: TalkMessage): void {
     this.cache.delete(message.raw.id);
     this.cache.set(message.raw.id, message);

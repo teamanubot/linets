@@ -4,3 +4,13 @@
 node_modules
 downloads
 apng-out
+
+# Group Guard (proteksi anti-kick-massal): tidak dicommit, hanya ada lokal.
+# npm start default jalan tanpa ini kalau src/main-proteksi.ts tidak ada.
+src/application/group-guard-proteksi.ts
+src/application/group-guard-proteksi.test.ts
+src/presentation/commands-proteksi.ts
+src/presentation/help-proteksi.ts
+src/presentation/help-proteksi.test.ts
+src/presentation/line-bot-proteksi.ts
+src/main-proteksi.ts

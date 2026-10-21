@@ -101,6 +101,41 @@ describe("GroupService", () => {
     assert.match(message.replies[0]!, /Pakai: tab tendang/);
   });
 
+  it("kickall: langsung jalan tanpa konfirmasi, mengeluarkan semua anggota kecuali diri sendiri", async () => {
+    const other = "u" + "c".repeat(32);
+    groups.groupMembers.cG1 = [SELF, FRIEND, other];
+
+    const message = new FakeMessage({ chatId: "cG1" });
+    await service.kickAll("", message);
+    assert.deepEqual(groups.calls, ["members:cG1", `kick:cG1:${FRIEND},${other}`]);
+    assert.match(message.replies[1]!, /Selesai\. Target: 2 orang/);
+  });
+
+  it("kickall: tanpa anggota lain (sendirian di grup)", async () => {
+    groups.groupMembers.cG1 = [SELF];
+    const message = new FakeMessage({ chatId: "cG1" });
+    await service.kickAll("", message);
+
+    assert.deepEqual(groups.calls, ["members:cG1"]);
+    assert.match(message.replies.at(-1)!, /Tidak ada anggota lain/);
+  });
+
+  it("kickall: bukan admin (kick gagal total) tetap melapor, tidak melempar error ke pemanggil", async () => {
+    groups.groupMembers.cG1 = [SELF, FRIEND];
+    groups.kick = async () => Promise.reject(new Error("no permission"));
+    const message = new FakeMessage({ chatId: "cG1" });
+    await service.kickAll("", message);
+
+    assert.match(message.replies.at(-1)!, /Gagal mengeluarkan siapa pun/);
+  });
+
+  it("perintah kickall di chat pribadi ditolak", async () => {
+    const message = new FakeMessage({ isGroupChat: false });
+    await service.kickAll("", message);
+    assert.deepEqual(groups.calls, []);
+    assert.match(message.replies[0]!, /hanya bisa dipakai di chat grup/);
+  });
+
   it("keluar: butuh konfirmasi 'ya'", async () => {
     const ask = new FakeMessage({ chatId: "cG1" });
     await service.leave("", ask);
