@@ -63,6 +63,8 @@ export interface CardInput {
   label?: string;
   /** Subjudul di bawah judul. */
   sub?: string;
+  /** Rasio lebar:tinggi gambar latar (gaya `latar`), mis. "16:9"; default "1:1". */
+  ratio?: string;
   /** Pengirim untuk bar tanda tangan (nama dan foto profil), dipakai gaya `latar`. */
   author?: { name: string; pictureUrl?: string };
 }
@@ -404,7 +406,7 @@ function latarCard(input: CardInput): FlexNode {
 
   const stage = imageUrl
     ? box([
-        { type: "image", url: imageUrl, size: "full", aspectRatio: "1:1", aspectMode: "cover", animated: true },
+        { type: "image", url: imageUrl, size: "full", aspectRatio: input.ratio ?? "1:1", aspectMode: "cover", animated: true },
         ...(body
           ? [
               box(centeredLines(body, "#FFFFFF"), {

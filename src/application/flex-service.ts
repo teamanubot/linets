@@ -40,7 +40,15 @@ const isHttpsUrl = (value: string) => /^https:\/\/\S+$/i.test(value);
 const isStyle = (value: string): value is CardStyle => (STYLE_NAMES as string[]).includes(value);
 const isTheme = (value: string): value is CardThemeName => (THEME_NAMES as string[]).includes(value);
 
-const OPTION_PATTERN = /^(tema|gambar|latar|gif|gaya|oleh|label|sub|tombol2)\s*:\s*(.+)$/is;
+const OPTION_PATTERN = /^(tema|gambar|latar|gif|gaya|oleh|label|sub|tombol2|rasio)\s*:\s*(.+)$/is;
+
+/** Rasio gambar "lebar:tinggi" (Flex: tinggi maksimal 3x lebar). */
+function parseRatio(value: string): string | null {
+  const match = /^(\d{1,4}):(\d{1,4})$/.exec(value.trim());
+  if (!match) return null;
+  const [width, height] = [Number(match[1]), Number(match[2])];
+  return width > 0 && height > 0 && height <= 3 * width ? `${width}:${height}` : null;
+}
 
 /** Pisahkan bagian bernilai `tema:` / `gambar:` / `gaya:` / `oleh:` / `label:` / `sub:` / `tombol2:` dari bagian posisi. */
 function splitOptions(parts: string[]): { positional: string[]; options: Record<string, string> } {
@@ -56,7 +64,7 @@ function splitOptions(parts: string[]): { positional: string[]; options: Record<
 
 const FLEX_USAGE =
   "Pakai: tab flex <judul> | <isi> [| <label tombol> | <link https>] [| gaya:chino] [| tema:pink] [| gambar:https://...] " +
-  "[| label:Teks] [| sub:Teks] [| oleh:Nama] [| tombol2:Label>https://...]\n" +
+  "[| label:Teks] [| sub:Teks] [| oleh:Nama] [| rasio:16:9] [| tombol2:Label>https://...]\n" +
   `Gaya: ${STYLE_NAMES.join(", ")}\nTema: ${THEME_NAMES.join(", ")}\n` +
   'Baris isi berbentuk "Label: nilai" tampil sebagai dua kolom. Lihat contoh semua gaya: tab flexgaya contoh';
 
@@ -172,6 +180,9 @@ export class FlexService {
     if (options.label && options.label.length > MAX_LABEL_LENGTH) return message.reply(`Teks "label" maks. ${MAX_LABEL_LENGTH} huruf.`);
     if (options.sub && options.sub.length > MAX_SUB_LENGTH) return message.reply(`Teks "sub" maks. ${MAX_SUB_LENGTH} huruf.`);
 
+    const ratio = options.rasio === undefined ? undefined : parseRatio(options.rasio);
+    if (options.rasio !== undefined && !ratio) return message.reply("Format rasio: rasio:16:9 (lebar:tinggi, tinggi maks. 3x lebar).");
+
     let button2Label: string | undefined;
     let button2Url: string | undefined;
     if (options.tombol2) {
@@ -193,6 +204,7 @@ export class FlexService {
       theme,
       style,
       imageUrl,
+      ratio: ratio ?? undefined,
       credit: options.oleh ?? (style === "latar" ? this.settings.flex.credit : undefined),
       label: options.label,
       sub: options.sub,

@@ -228,6 +228,14 @@ describe("gaya latar", () => {
     assert.equal(bar.contents.length, 2); // tidak ada teks nama
   });
 
+  it("rasio gambar bisa diatur (default 1:1) untuk GIF landscape", () => {
+    const wide: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png", ratio: "16:9" });
+    const square: Node = buildCard({ title: "T", text: "I", style: "latar", imageUrl: "https://a.id/x.png" });
+
+    assert.equal(wide.body.contents[0].contents[0].aspectRatio, "16:9");
+    assert.equal(square.body.contents[0].contents[0].aspectRatio, "1:1");
+  });
+
   it("isi '-' berarti gambar saja tanpa teks dan tanpa lapisan gelap", () => {
     const card: Node = buildCard({ title: "T", text: "-", style: "latar", imageUrl: "https://a.id/x.png", author, credit });
     assert.equal(card.body.contents[0].contents.length, 1);

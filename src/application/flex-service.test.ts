@@ -286,6 +286,18 @@ describe("FlexService: gaya, pratinjau, galeri", () => {
     assert.equal(store.saved.at(-1)?.flex.credit, "Powered By TeamAnuBot");
   });
 
+  it("opsi rasio: dipakai sebagai aspectRatio gambar latar; format tidak sah ditolak", async () => {
+    await service.sendCard("J | I | gaya:latar | gif:https://a.id/x.png | rasio:25:14", new FakeMessage());
+    assert.match(JSON.stringify(sender.sent[0]!.contents), /"aspectRatio":"25:14"/);
+
+    for (const bad of ["rasio:16-9", "rasio:0:5", "rasio:1:4", "rasio:abc"]) {
+      const message = new FakeMessage();
+      await service.sendCard(`J | I | gaya:latar | ${bad}`, message);
+      assert.match(message.replies[0]!, /Format rasio: rasio:16:9/, bad);
+    }
+    assert.equal(sender.sent.length, 1);
+  });
+
   it("gaya latar dengan URL .gif: diberi petunjuk APNG; URL .png tidak", async () => {
     const gif = new FakeMessage();
     await service.sendCard("J | I | gaya:latar | gif:https://a.id/x.gif?v=2", gif);

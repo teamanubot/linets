@@ -151,20 +151,22 @@ Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
 **foto profil LINE-mu** di **kanan** (diambil otomatis dari akun yang menjalankan bot). Contoh:
 
 ```
-tab flex Selamat Pagi | Semangat terus ya | gaya:latar | tema:biru | gif:https://hostingmu.id/latar-coderain.png
-tab flex Teknologi | - | gaya:latar | gif:https://hostingmu.id/latar-coderain.png     (isi "-" = gambar saja tanpa teks)
+tab flex Selamat Pagi | Semangat terus ya | gaya:latar | tema:biru | gif:https://hostingmu.id/latar-flex.png | rasio:25:14
+tab flex Teknologi | - | gaya:latar | gif:https://hostingmu.id/latar-flex.png | rasio:25:14     (isi "-" = gambar saja tanpa teks)
 ```
 
 Teks kiri bar bawah: `tab flexgaya oleh <teks>` (tersimpan; `tab flexgaya oleh reset` mengembalikan), atau sekali pakai dengan opsi `| oleh:Teks`.
-Opsi `gif:` / `latar:` / `gambar:` sama saja (URL https).
+Opsi `gif:` / `latar:` / `gambar:` sama saja (URL https). `rasio:LEBAR:TINGGI` mengatur bentuk gambar latar (default `1:1`; untuk GIF landscape
+misalnya `rasio:16:9`), supaya seluruh gambar tampil utuh.
 
 > **Gerak di Flex hanya untuk APNG, bukan GIF.** Hasil uji: GIF biasa tampil diam, stiker animasi LINE (APNG) bergerak tetapi **berhenti** setelah
 > jumlah putaran di dalam file habis (stiker yang diuji: 3 putaran), sedangkan APNG berputar tanpa henti (`num_plays=0`) terus bergerak.
-> - Siap pakai: **`assets/latar-coderain.png`**, animasi hujan kode bertema IT (461 KB, tak terbatas). Buat variasi warna dengan
->   `python3 scripts/make-coderain.py keluaran.png 320 biru` (butuh `pip install pillow`).
-> - Ubah GIF-mu sendiri: `npx tsx scripts/gif-to-apng.ts <url-atau-file.gif> [lebar-maks=480] [fps=12]` → file di `apng-out/`.
+> - Siap pakai: **`assets/latar-flex.png`**, hasil konversi `assets/latar-flex.gif` (animasi angka biner bertema IT): APNG 400×224, 897 KB,
+>   berulang tanpa henti, `rasio:25:14`. Alat pembuat animasi hujan kode juga ada: `python3 scripts/make-coderain.py keluaran.png 320 biru` (butuh Pillow).
+> - Ubah GIF-mu sendiri: `npx tsx scripts/gif-to-apng.ts <url-atau-file.gif> [lebar-maks=480] [fps=12] [batas-KB=950]` → file di `apng-out/`
+>   (palet 8-bit; lebar, fps, dan jumlah warna diturunkan bertahap sampai muat di batas; ia juga mencetak `rasio:` yang pas).
 > - **Hosting:** unggah file ke tempat berlink https milikmu, misalnya commit ke repo GitHub lalu pakai link
->   `https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/latar-coderain.png`. Usahakan ukuran di bawah 1 MB.
+>   `https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/latar-flex.png`. Usahakan ukuran di bawah 1 MB.
 
 **Opsi** (letakkan di bagian mana pun setelah judul dan isi, dipisah `|`): `gaya:` · `tema:` · `gambar:https://…` · `label:Kategori` ·
 `sub:Subjudul` · `oleh:Nama` · `tombol2:Label>https://…`. Baris isi berbentuk `Label: nilai` (pisahkan baris dengan Enter) tampil sebagai dua kolom.
