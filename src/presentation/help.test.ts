@@ -41,6 +41,6 @@ describe("bantuan", () => {
   });
 
   it("panjang menu jauh di bawah batas pesan LINE (5000 karakter)", () => {
-    assert.ok(renderHelp().length < 2000);
+    assert.ok(renderHelp().length < 3000);
   });
 });

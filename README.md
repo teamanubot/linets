@@ -13,7 +13,9 @@ Fitur utama: ganti foto profil dengan gambar, video, atau keduanya, termasuk vid
 - [Git](https://git-scm.com/)
 - Koneksi internet saat `npm install` (library diambil dari `npm.jsr.io`, tidak perlu login npm)
 - Aplikasi LINE di HP untuk scan QR
-- Python 3.9+ (hanya untuk `tab vpl`: `yt-dlp` dijalankan lewat Python)
+- Python 3.9+ (hanya untuk `tab vpl`/`tab dl-*`: `yt-dlp` dijalankan lewat Python)
+- `pip install curl_cffi` (hanya untuk `tab dl-tiktok`: TikTok menolak permintaan yt-dlp biasa, butuh TLS impersonation dari paket ini)
+- Google Chrome/Chromium terpasang (hanya untuk `tab search-tiktok`; cek lewat env `CHROME_PATH` kalau lokasinya bukan `/usr/bin/google-chrome`)
 
 ffmpeg dan `yt-dlp` tidak perlu dipasang sendiri: keduanya ikut terunduh lewat `npm install`
 (`yt-dlp` diambil dari GitHub, jadi butuh akses ke github.com saat install).
@@ -126,6 +128,53 @@ Berbeda dengan video foto profil yang tidak dibatasi (teruji sampai 10 menit).
 | `tab antiunsend on/off` | Kabari kamu (di chat dengan diri sendiri) isi pesan yang ditarik orang lain. Default aktif. Hanya pesan yang diterima saat bot berjalan |
 
 Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
+
+### Unduh media
+
+| Perintah | Fungsi |
+| --- | --- |
+| `tab dl-ig <link>` | Unduh dari **Instagram** |
+| `tab dl-tiktok <link>` | Unduh dari **TikTok** |
+| `tab dl-facebook <link>` | Unduh dari **Facebook** |
+| `tab dl-twitter <link>` | Unduh dari **Twitter/X** |
+| `tab dl-yt <link>` | Unduh dari **YouTube** |
+| `tab dl-ytmp3 <link>` | Jalan pintas: langsung audio mp3 dari YouTube |
+
+Tidak perlu pilih mp3/foto/video manual: bot cek langsung dari postingannya, lalu otomatis mengunduh **video**
+(kualitas terbaik yang tersedia, sampai 4K di YouTube, dengan suara) atau **foto** (gambar aslinya) sesuai isi
+link-nya. Postingan **karusel** (campuran beberapa foto & video dalam satu postingan, umum di Instagram/Facebook)
+diunduh semuanya, urut sesuai slide-nya, dan dikirim satu per satu. `dl-ytmp3` adalah jalan pintas khusus YouTube
+yang melewati deteksi otomatis di atas dan selalu menghasilkan audio mp3 kualitas terbaik.
+
+**Keterbatasan yang sudah dicek langsung (bukan asumsi), di luar kendali bot ini:**
+- **Instagram** sekarang mewajibkan login untuk hampir semua postingan — `dl-ig` kemungkinan besar gagal untuk
+  kebanyakan link selama belum ada cara memasukkan cookies akun yang login (belum didukung). Postingan karusel
+  (beberapa foto/video dalam satu postingan) sudah didukung kalau link-nya bisa diakses.
+- **Twitter/X**: yt-dlp sendiri tidak mendukung mengambil tweet yang isinya foto saja (hanya video). Untuk itu
+  `dl-twitter` punya jalur cadangan lewat endpoint publik syndication Twitter (yang dipakai widget embed resmi,
+  tanpa login) supaya tweet foto-saja tetap bisa diunduh, kualitas penuh.
+- **YouTube Community post** (`youtube.com/post/<id>`) juga tidak punya extractor di yt-dlp sama sekali. `dl-yt`
+  punya jalur cadangan yang membaca data postingannya langsung dari halamannya (tanpa login) untuk link seperti ini.
+- **TikTok** dan **Facebook** video publik sudah dicoba langsung dan berhasil.
+
+Setiap perintah hanya menerima link dari platformnya sendiri — kalau link-nya dari platform lain, bot kasih tahu
+perintah yang benar. Hasil dikirim ke chat ini; di atas ±200 MB (per item) ditolak (batas upload LINE). File
+sementara otomatis dihapus setelah selesai/gagal.
+
+### Cari media
+
+| Perintah | Fungsi |
+| --- | --- |
+| `tab search-yt <kata kunci>` | Cari video **YouTube** (resmi lewat yt-dlp), 10 hasil teratas |
+| `tab search-tiktok <kata kunci>` | Cari video **TikTok**, 10 hasil teratas |
+| `tab lanjut` | 10 hasil berikutnya dari pencarian terakhir di chat ini (11-20, 21-30, dst.) |
+| `tab pilih <nomor>` | Detail satu hasil (judul/caption + pembuat + link), siap ditempel ke `tab dl-*` untuk diunduh |
+
+Pencarian Instagram/Facebook/Twitter(X) **belum didukung** — ketiganya mewajibkan login akun di situsnya untuk bisa
+mencari sama sekali, jadi tidak bisa dilakukan lewat bot ini. Pencarian TikTok memakai Chrome headless (lihat
+"Kebutuhan" di atas) karena TikTok mewajibkan permintaan pencariannya ditandatangani oleh skrip TikTok sendiri;
+karena itu hasilnya terbatas pada satu kali pengambilan dari platform TikTok (biasanya puluhan item), bukan
+keterbatasan dari sisi bot.
 
 ### Flex Message (lewat LIFF)
 

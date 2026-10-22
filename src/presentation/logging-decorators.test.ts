@@ -56,19 +56,22 @@ describe("LoggingMediaSender & LoggingNotifier", () => {
     const inner: MediaSender = {
       sendImage: async (_chat, image) => void sent.push(`image:${image.length}`),
       sendVideo: async (_chat, video, ms) => void sent.push(`video:${video.length}:${ms}`),
+      sendAudio: async (_chat, audio, ms) => void sent.push(`audio:${audio.length}:${ms}`),
     };
     const sender = new LoggingMediaSender(inner, logger);
     await sender.sendImage("c1", Buffer.alloc(2048));
     await sender.sendVideo("c1", Buffer.alloc(2 * 1024 * 1024), 12_000);
+    await sender.sendAudio("c1", Buffer.alloc(1024 * 1024), 9_000);
 
     const notifier = new FakeNotifier();
     await new LoggingNotifier(notifier, logger).notify("🗑️ Pesan ditarik");
 
-    assert.deepEqual(sent, ["image:2048", `video:${2 * 1024 * 1024}:12000`]);
+    assert.deepEqual(sent, ["image:2048", `video:${2 * 1024 * 1024}:12000`, `audio:${1024 * 1024}:9000`]);
     assert.deepEqual(notifier.sent, ["🗑️ Pesan ditarik"]);
     assert.deepEqual(logger.lines, [
       "📤 kirim gambar (2 KB)",
       "📤 kirim video (2.0 MB, 12 dtk)",
+      "📤 kirim audio (1.0 MB, 9 dtk)",
       '📤 kirim ke chat sendiri: "🗑️ Pesan ditarik"',
     ]);
   });

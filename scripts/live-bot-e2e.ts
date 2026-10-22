@@ -14,6 +14,8 @@ import { AntiUnsend } from "../src/application/anti-unsend.ts";
 import { FlexService } from "../src/application/flex-service.ts";
 import { ProfilePictures } from "../src/application/profile-pictures.ts";
 import { YoutubeVideo } from "../src/application/youtube-video.ts";
+import { MediaDownloader } from "../src/application/media-downloader.ts";
+import { MediaSearch } from "../src/application/media-search.ts";
 import { SpeedTest } from "../src/application/speed-test.ts";
 import { AutoReply } from "../src/application/auto-reply.ts";
 import { GroupService } from "../src/application/group-service.ts";
@@ -23,7 +25,8 @@ import { FfmpegMediaProcessor, runFfmpeg, withTempDir } from "../src/infrastruct
 import { FileMediaStore } from "../src/infrastructure/file-media-store.ts";
 import { FileSettingsStore } from "../src/infrastructure/file-settings-store.ts";
 import { login } from "../src/infrastructure/line/auth.ts";
-import { YtDlpDownloader } from "../src/infrastructure/yt-dlp-downloader.ts";
+import { YtDlpDownloader, YtDlpMediaFetcher, YtDlpSearchProvider } from "../src/infrastructure/yt-dlp-downloader.ts";
+import { TikTokSearchBrowser } from "../src/infrastructure/tiktok-search-browser.ts";
 import { LineApiProbe } from "../src/infrastructure/line/line-api-probe.ts";
 import { LineCoverGateway } from "../src/infrastructure/line/line-cover-gateway.ts";
 import { LineGroupGateway } from "../src/infrastructure/line/line-group-gateway.ts";
@@ -68,6 +71,8 @@ startLineBot({
   youtube: new YoutubeVideo({ downloader: new YtDlpDownloader(), profile, media }),
   flex: new FlexService({ sender: new LineFlexSender(client), store: settings }),
   pictures: new ProfilePictures({ viewer: new LineProfileViewer(client), sender: new LineMediaSender(client), media, selfId: mid }),
+  downloader: new MediaDownloader({ fetcher: new YtDlpMediaFetcher(), sender: new LineMediaSender(client), media }),
+  search: new MediaSearch({ providers: { youtube: new YtDlpSearchProvider(), tiktok: new TikTokSearchBrowser() } }),
 });
 
 const replies: string[] = [];

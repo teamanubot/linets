@@ -28,6 +28,9 @@ class FakeSender implements MediaSender {
   async sendVideo(chatId: string, video: Buffer, durationMs: number) {
     this.sent.push(`video:${chatId}:${video}:${durationMs}`);
   }
+  async sendAudio(chatId: string, audio: Buffer, durationMs: number) {
+    this.sent.push(`audio:${chatId}:${audio}:${durationMs}`);
+  }
 }
 
 const media: MediaProcessor = {

@@ -57,6 +57,11 @@ export class LoggingMediaSender implements MediaSender {
     this.logger.info(`📤 kirim video (${(video.length / 1024 / 1024).toFixed(1)} MB, ${(durationMs / 1000).toFixed(0)} dtk)`);
     await this.inner.sendVideo(chatId, video, durationMs);
   }
+
+  async sendAudio(chatId: string, audio: Buffer, durationMs: number): Promise<void> {
+    this.logger.info(`📤 kirim audio (${(audio.length / 1024 / 1024).toFixed(1)} MB, ${(durationMs / 1000).toFixed(0)} dtk)`);
+    await this.inner.sendAudio(chatId, audio, durationMs);
+  }
 }
 
 /** Mencatat pemberitahuan yang dikirim bot ke chat dengan diri sendiri. */

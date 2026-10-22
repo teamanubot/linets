@@ -8,6 +8,8 @@ import type { YoutubeVideo } from "../application/youtube-video.ts";
 import type { FlexService } from "../application/flex-service.ts";
 import type { MediaSaver } from "../application/media-saver.ts";
 import type { FlowName, ProfileFlow } from "../application/profile-flow.ts";
+import type { MediaDownloader } from "../application/media-downloader.ts";
+import type { MediaSearch } from "../application/media-search.ts";
 import type { ChatMessage } from "../domain/chat.ts";
 import { helpCard, renderHelp } from "./help.ts";
 
@@ -33,6 +35,8 @@ export interface CommandDeps {
   youtube: YoutubeVideo;
   pictures: ProfilePictures;
   flex: FlexService;
+  downloader: MediaDownloader;
+  search: MediaSearch;
   displayName: string;
 }
 
@@ -48,6 +52,8 @@ export function createCommands({
   youtube,
   pictures,
   flex,
+  downloader,
+  search,
   displayName,
 }: CommandDeps): Record<string, Command> {
   return {
@@ -60,6 +66,16 @@ export function createCommands({
     vp: (_args, message) => startFlow(profileFlow, coverFlow, "vp", message),
     vp2: (_args, message) => startFlow(profileFlow, coverFlow, "vp2", message),
     vpl: (args, message) => youtube.setAsProfileVideo(args, message),
+    "dl-ig": (args, message) => downloader.run(args, message, "instagram"),
+    "dl-tiktok": (args, message) => downloader.run(args, message, "tiktok"),
+    "dl-facebook": (args, message) => downloader.run(args, message, "facebook"),
+    "dl-twitter": (args, message) => downloader.run(args, message, "twitter"),
+    "dl-yt": (args, message) => downloader.run(args, message, "youtube"),
+    "dl-ytmp3": (args, message) => downloader.run(args, message, "youtube", true),
+    "search-yt": (args, message) => search.search("youtube", args, message),
+    "search-tiktok": (args, message) => search.search("tiktok", args, message),
+    lanjut: (_args, message) => search.next(message),
+    pilih: (args, message) => search.pick(args, message),
     tpp: (args, message) => pictures.show(args, message),
     flex: (args, message) => flex.sendCard(args, message),
     flexjson: (args, message) => flex.sendJson(args, message),

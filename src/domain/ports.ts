@@ -138,10 +138,51 @@ export interface ProfileViewer {
   fetchPicture(userId: string): Promise<UserPicture>;
 }
 
-/** Mengirim gambar/video ke sebuah chat (diimplementasikan oleh infrastructure). */
+/** Mengirim gambar/video/audio ke sebuah chat (diimplementasikan oleh infrastructure). */
 export interface MediaSender {
   sendImage(chatId: string, image: Buffer): Promise<void>;
   sendVideo(chatId: string, video: Buffer, durationMs: number): Promise<void>;
+  sendAudio(chatId: string, audio: Buffer, durationMs: number): Promise<void>;
+}
+
+/** Jenis satu berkas hasil unduhan: video (dengan suara), audio saja (mp3), atau gambar (foto post/thumbnail). */
+export type DownloadKind = "video" | "audio" | "image";
+
+/** Satu berkas dari hasil unduhan (postingan karusel bisa punya lebih dari satu, campur foto & video). */
+export interface FetchedMediaItem {
+  path: string;
+  kind: DownloadKind;
+}
+
+/** Hasil unduh media sosial di disk; panggil `dispose()` sekali untuk menghapus semua file sementaranya. */
+export interface FetchedMedia {
+  title: string;
+  /** Satu item untuk postingan biasa; beberapa item (urut) untuk karusel foto/video. */
+  items: FetchedMediaItem[];
+  dispose(): Promise<void>;
+}
+
+/**
+ * Mengunduh media dari Instagram/Twitter(X)/Facebook/TikTok/YouTube (diimplementasikan oleh infrastructure).
+ * Jenisnya (video/foto, atau campuran untuk karusel) dideteksi otomatis dari postingannya, bukan dipilih pengguna.
+ */
+export interface MediaFetcher {
+  /** `forceAudio`: lewati deteksi otomatis, selalu ekstrak audio mp3 (dipakai khusus oleh dl-ytmp3). */
+  fetch(url: string, forceAudio?: boolean): Promise<FetchedMedia>;
+}
+
+/** Satu hasil pencarian: judul/caption, pembuat (kalau ada), link ke postingannya, info singkat tambahan (durasi dsb). */
+export interface SearchResultItem {
+  title: string;
+  author?: string;
+  link: string;
+  extra?: string;
+}
+
+/** Mencari media di sebuah platform (diimplementasikan oleh infrastructure, satu per platform). */
+export interface SearchProvider {
+  /** Ambil sampai `limit` hasil teratas untuk query ini; bisa mengembalikan lebih sedikit kalau platform tidak punya/tidak bisa ambil sebanyak itu. */
+  search(query: string, limit: number): Promise<SearchResultItem[]>;
 }
 
 /** Mengirim Flex Message sebagai akun sendiri (lewat LIFF). */

@@ -3,6 +3,8 @@ import { AntiUnsend } from "./application/anti-unsend.ts";
 import { FlexService } from "./application/flex-service.ts";
 import { ProfilePictures } from "./application/profile-pictures.ts";
 import { YoutubeVideo } from "./application/youtube-video.ts";
+import { MediaDownloader } from "./application/media-downloader.ts";
+import { MediaSearch } from "./application/media-search.ts";
 import { SpeedTest } from "./application/speed-test.ts";
 import { AutoReply } from "./application/auto-reply.ts";
 import { AccountService } from "./application/account-service.ts";
@@ -13,7 +15,8 @@ import { FfmpegMediaProcessor } from "./infrastructure/ffmpeg/ffmpeg-media-proce
 import { FileSettingsStore } from "./infrastructure/file-settings-store.ts";
 import { FileMediaStore } from "./infrastructure/file-media-store.ts";
 import { login } from "./infrastructure/line/auth.ts";
-import { removeStaleDownloads, YtDlpDownloader } from "./infrastructure/yt-dlp-downloader.ts";
+import { removeStaleDownloads, YtDlpDownloader, YtDlpMediaFetcher, YtDlpSearchProvider } from "./infrastructure/yt-dlp-downloader.ts";
+import { TikTokSearchBrowser } from "./infrastructure/tiktok-search-browser.ts";
 import { LineApiProbe } from "./infrastructure/line/line-api-probe.ts";
 import { LineCoverGateway } from "./infrastructure/line/line-cover-gateway.ts";
 import { LineGroupGateway } from "./infrastructure/line/line-group-gateway.ts";
@@ -62,13 +65,16 @@ const flex = new FlexService({ sender: new LineFlexSender(client), store: settin
 await Promise.all([autoReply.init(), antiUnsend.init(), flex.init()]);
 const speedTest = new SpeedTest({ probe: new LineApiProbe(client) });
 const youtube = new YoutubeVideo({ downloader: new YtDlpDownloader(), profile, media });
+const mediaSender = new LoggingMediaSender(new LineMediaSender(client), logger);
 const pictures = new ProfilePictures({
   viewer: new LineProfileViewer(client),
-  sender: new LoggingMediaSender(new LineMediaSender(client), logger),
+  sender: mediaSender,
   media,
   selfId: client.base.profile?.mid ?? "",
 });
+const downloader = new MediaDownloader({ fetcher: new YtDlpMediaFetcher(), sender: mediaSender, media });
+const search = new MediaSearch({ providers: { youtube: new YtDlpSearchProvider(), tiktok: new TikTokSearchBrowser() } });
 
 console.log(`Login sebagai ${displayName}`);
-startLineBot({ client, logger, people, profileFlow, coverFlow, account, groups, mediaSaver, autoReply, antiUnsend, speedTest, youtube, pictures, flex, displayName });
+startLineBot({ client, logger, people, profileFlow, coverFlow, account, groups, mediaSaver, autoReply, antiUnsend, speedTest, youtube, pictures, flex, downloader, search, displayName });
 console.log("Bot berjalan. Tekan Ctrl+C untuk berhenti.");
