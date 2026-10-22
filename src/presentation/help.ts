@@ -124,6 +124,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       "Postingan karusel (campuran beberapa foto & video dalam satu postingan) diunduh semuanya, urut sesuai slide-nya.",
       "dl-ytmp3 → jalan pintas khusus YouTube: selalu audio mp3 kualitas terbaik, lewati deteksi otomatis di atas.",
       "Hasil dikirim langsung ke chat ini. Di atas ±200 MB ditolak (batas upload LINE). File sementara selalu dihapus setelah selesai/gagal.",
+      "Postingan yang butuh login (banyak terjadi di Instagram/Facebook) bisa diambilkan cookies-nya; lihat \"Cookies untuk dl-*\" di README (bukan bot yang login, cuma baca cookies yang kamu ekspor sendiri dari browser).",
     ],
   },
   {

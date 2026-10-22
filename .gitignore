@@ -6,6 +6,9 @@ node_modules
 downloads
 apng-out
 .antiunsend-cache
+# Cookies login (lihat README "Cookies untuk dl-*"): setara password, jangan pernah dicommit.
+cookies/
+*.cookies.txt
 
 # Group Guard (proteksi anti-kick-massal): tidak dicommit, hanya ada lokal.
 # npm start default jalan tanpa ini kalau src/main-proteksi.ts tidak ada.

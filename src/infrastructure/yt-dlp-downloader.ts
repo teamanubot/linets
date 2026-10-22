@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -23,7 +24,15 @@ const MAX_QUALITY_HEIGHT = 2160;
 function describeFailure(error: unknown): Error {
   const stderr = String((error as { stderr?: string }).stderr ?? "");
   const line = stderr.split("\n").reverse().find((candidate) => candidate.includes("ERROR:"));
-  if (line) return new Error(line.replace(/^.*ERROR:\s*(\[[^\]]+\]\s*[\w-]+:\s*)?/, "").trim());
+  if (line) {
+    const cleaned = line.replace(/^.*ERROR:\s*(\[[^\]]+\]\s*[\w-]+:\s*)?/, "").trim();
+    // "Cannot parse data" di extractor Facebook: pesan asli yt-dlp sudah usang (versi lebih baru memastikan
+    // ini memang perlu login), sudah dicek langsung. Postingan macam ini sama-sama tidak bisa diambil tanpa cookies.
+    if (/\[facebook\]/i.test(line) && /cannot parse data/i.test(cleaned)) {
+      return new Error("Postingan Facebook ini kemungkinan besar butuh login untuk diakses (banyak postingan Facebook sekarang begitu), belum didukung bot ini.");
+    }
+    return new Error(cleaned);
+  }
   if ((error as NodeJS.ErrnoException).code === "ENOENT") return new Error("yt-dlp tidak ditemukan. Jalankan npm install lagi.");
   if ((error as { killed?: boolean }).killed) return new Error("Pengunduhan melebihi batas waktu.");
   return new Error("yt-dlp gagal dijalankan (butuh Python 3.9+).");
@@ -166,6 +175,24 @@ async function fetchTwitterPhotos(url: string, directory: string): Promise<Fetch
   return downloadImages(photoUrls, directory);
 }
 
+/** User-Agent crawler resmi Facebook; satu-satunya yang diizinkan Facebook memuat halaman postingan tanpa login. */
+const FACEBOOK_CRAWLER_UA = "facebookexternalhit/1.1";
+
+/**
+ * yt-dlp (extractor facebook.py) sama sekali tidak mengisi field thumbnail untuk postingan foto-saja (sudah
+ * dicoba langsung: "There are no video thumbnails to download"), beda dengan Instagram. Fallback ini membaca
+ * tag `og:image` dari HTML halamannya (lewat User-Agent crawler Facebook, satu-satunya yang diizinkan tanpa
+ * login) untuk postingan macam itu. Hanya dipakai kalau yt-dlp tidak dapat apa-apa.
+ */
+async function fetchFacebookPhoto(url: string, directory: string): Promise<FetchedMediaItem[]> {
+  const res = await fetch(url, { headers: { "User-Agent": FACEBOOK_CRAWLER_UA } });
+  if (!res.ok) return [];
+  const html = await res.text();
+  const match = /<meta property="og:image" content="([^"]+)"/.exec(html);
+  if (!match) return [];
+  return downloadImages([match[1]!.replace(/&amp;/g, "&")], directory);
+}
+
 /** Cari semua nilai dari objek bersarang (hasil parse JSON) yang key-nya cocok, tanpa tergantung bentuk/path pastinya. */
 function findAllByKey(obj: unknown, key: string): unknown[] {
   if (!obj || typeof obj !== "object") return [];
@@ -180,6 +207,66 @@ function findAllByKey(obj: unknown, key: string): unknown[] {
 /** Thumbnail YouTube (yt3.ggpht.com/...) diberi suffix `=sNNN-...`; ganti jadi `=s0` untuk resolusi aslinya. */
 function originalQuality(thumbnailUrl: string): string {
   return thumbnailUrl.replace(/=s\d+(?:-[\w-]+)?$/, "=s0");
+}
+
+/**
+ * Cookies manual per platform (file Netscape cookies.txt, diekspor sendiri dari browser yang sudah login —
+ * bot TIDAK PERNAH login sendiri). Dicari otomatis di folder `cookies/` dari nama filenya (sama seperti nama
+ * bawaan ekstensi browser, mis. "www.facebook.com_cookies.txt" — tinggal ditaruh di sana, tidak perlu diatur
+ * apa-apa lagi); env var dipakai cuma kalau mau path/nama file lain. Kalau tidak ketemu dua-duanya, unduhan
+ * tetap jalan seperti biasa tanpa cookies (sebagian besar postingan publik memang tidak butuh ini).
+ */
+interface CookiePlatform {
+  envVar: string;
+  /** Dicocokkan (contains, tanpa besar-kecil huruf) ke nama file di folder cookies/. */
+  domainKeyword: string;
+}
+
+const COOKIE_PLATFORMS: Record<string, CookiePlatform> = {
+  "tiktok.com": { envVar: "TIKTOK_COOKIES_FILE", domainKeyword: "tiktok.com" },
+  "www.tiktok.com": { envVar: "TIKTOK_COOKIES_FILE", domainKeyword: "tiktok.com" },
+  "m.tiktok.com": { envVar: "TIKTOK_COOKIES_FILE", domainKeyword: "tiktok.com" },
+  "instagram.com": { envVar: "INSTAGRAM_COOKIES_FILE", domainKeyword: "instagram.com" },
+  "www.instagram.com": { envVar: "INSTAGRAM_COOKIES_FILE", domainKeyword: "instagram.com" },
+  "facebook.com": { envVar: "FACEBOOK_COOKIES_FILE", domainKeyword: "facebook.com" },
+  "www.facebook.com": { envVar: "FACEBOOK_COOKIES_FILE", domainKeyword: "facebook.com" },
+  "m.facebook.com": { envVar: "FACEBOOK_COOKIES_FILE", domainKeyword: "facebook.com" },
+  "fb.watch": { envVar: "FACEBOOK_COOKIES_FILE", domainKeyword: "facebook.com" },
+  "twitter.com": { envVar: "TWITTER_COOKIES_FILE", domainKeyword: "twitter.com" },
+  "www.twitter.com": { envVar: "TWITTER_COOKIES_FILE", domainKeyword: "twitter.com" },
+  "x.com": { envVar: "TWITTER_COOKIES_FILE", domainKeyword: "x.com" },
+  "www.x.com": { envVar: "TWITTER_COOKIES_FILE", domainKeyword: "x.com" },
+  "youtube.com": { envVar: "YOUTUBE_COOKIES_FILE", domainKeyword: "youtube.com" },
+  "www.youtube.com": { envVar: "YOUTUBE_COOKIES_FILE", domainKeyword: "youtube.com" },
+  "m.youtube.com": { envVar: "YOUTUBE_COOKIES_FILE", domainKeyword: "youtube.com" },
+  "youtu.be": { envVar: "YOUTUBE_COOKIES_FILE", domainKeyword: "youtube.com" },
+};
+
+const COOKIES_DIR = "./cookies";
+
+/** Berkas pertama di folder cookies/ yang namanya mengandung `domainKeyword` (cocok nama bawaan ekstensi browser). */
+function findCookiesInDir(domainKeyword: string): string | null {
+  try {
+    const match = readdirSync(COOKIES_DIR).find((name) => name.toLowerCase().includes(domainKeyword));
+    return match ? join(COOKIES_DIR, match) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `["--cookies", path]` kalau ketemu (env var eksplisit, atau otomatis dari folder cookies/); selain itu array kosong. */
+function cookiesArgsFor(url: string): string[] {
+  try {
+    const hostname = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase();
+    const platform = COOKIE_PLATFORMS[hostname];
+    if (!platform) return [];
+
+    const fromEnv = process.env[platform.envVar];
+    const path = fromEnv && existsSync(fromEnv) ? fromEnv : findCookiesInDir(platform.domainKeyword);
+    return path ? ["--cookies", path] : [];
+  } catch {
+    return [];
+  }
 }
 
 /** youtube.com/post/<id>, bentuk URL khusus Community post (tidak didukung yt-dlp sama sekali). */
@@ -235,6 +322,7 @@ export class YtDlpMediaFetcher implements MediaFetcher {
     const directory = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
     const dispose = () => rm(directory, { recursive: true, force: true });
     const ffmpegDir = dirname(ffmpegInstaller.path);
+    const cookies = cookiesArgsFor(url);
 
     // yt-dlp tidak punya extractor sama sekali untuk Community post YouTube; tidak ada gunanya mencobanya dulu.
     if (!forceAudio && isYoutubeCommunityPost(url)) {
@@ -249,7 +337,7 @@ export class YtDlpMediaFetcher implements MediaFetcher {
     }
 
     try {
-      const { stdout } = await run(YT_DLP, ["--yes-playlist", "--no-warnings", IGNORE_NO_FORMATS, "--skip-download", "--dump-single-json", url], {
+      const { stdout } = await run(YT_DLP, ["--yes-playlist", "--no-warnings", IGNORE_NO_FORMATS, ...cookies, "--skip-download", "--dump-single-json", url], {
         timeout: INFO_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024,
       });
@@ -261,7 +349,7 @@ export class YtDlpMediaFetcher implements MediaFetcher {
         await run(
           YT_DLP,
           [
-            "--no-playlist", "--no-warnings", IGNORE_NO_FORMATS, "--no-progress",
+            "--no-playlist", "--no-warnings", IGNORE_NO_FORMATS, "--no-progress", ...cookies,
             "-x", "--audio-format", "mp3", "--audio-quality", "0", // VBR terbaik yang tersedia dari sumbernya.
             "--ffmpeg-location", ffmpegDir, "--max-filesize", MAX_SOURCE_SIZE,
             "-o", join(directory, "item0.%(ext)s"),
@@ -286,7 +374,7 @@ export class YtDlpMediaFetcher implements MediaFetcher {
         const isVideo = hasVideoFormat(entry);
         const base = join(directory, `item${itemIndex}`);
         const common = [
-          "--no-warnings", IGNORE_NO_FORMATS, "--no-progress",
+          "--no-warnings", IGNORE_NO_FORMATS, "--no-progress", ...cookies,
           "--ffmpeg-location", ffmpegDir,
           "--max-filesize", MAX_SOURCE_SIZE,
           "-o", `${base}.%(ext)s`,
@@ -309,9 +397,12 @@ export class YtDlpMediaFetcher implements MediaFetcher {
         if (file) items.push({ path: join(directory, file), kind: isVideo ? "video" : "image" });
       }
 
-      const isTwitter = /(?:^|\.)(?:twitter\.com|x\.com)$/i.test(new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname);
-      if (items.length === 0 && isTwitter) {
+      const hostname = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname;
+      if (items.length === 0 && /(?:^|\.)(?:twitter\.com|x\.com)$/i.test(hostname)) {
         items.push(...(await fetchTwitterPhotos(url, directory)));
+      }
+      if (items.length === 0 && (/(?:^|\.)facebook\.com$/i.test(hostname) || hostname.toLowerCase() === "fb.watch")) {
+        items.push(...(await fetchFacebookPhoto(url, directory)));
       }
       if (items.length === 0) throw new Error(`Tidak ada media yang bisa diunduh dari link ini (mungkin lebih dari ${MAX_SOURCE_SIZE.replace("G", " GB")}).`);
       return { title, items, dispose };
