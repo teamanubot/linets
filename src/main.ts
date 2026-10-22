@@ -5,8 +5,11 @@ import { ProfilePictures } from "./application/profile-pictures.ts";
 import { YoutubeVideo } from "./application/youtube-video.ts";
 import { MediaDownloader } from "./application/media-downloader.ts";
 import { MediaSearch } from "./application/media-search.ts";
+import { SaveProfile } from "./application/save-profile.ts";
+import { RecoverProfile } from "./application/recover-profile.ts";
 import { SpeedTest } from "./application/speed-test.ts";
 import { AutoReply } from "./application/auto-reply.ts";
+import { AutoRead } from "./application/auto-read.ts";
 import { AccountService } from "./application/account-service.ts";
 import { GroupService } from "./application/group-service.ts";
 import { MediaSaver } from "./application/media-saver.ts";
@@ -14,13 +17,18 @@ import { ProfileFlow } from "./application/profile-flow.ts";
 import { FfmpegMediaProcessor } from "./infrastructure/ffmpeg/ffmpeg-media-processor.ts";
 import { FileSettingsStore } from "./infrastructure/file-settings-store.ts";
 import { FileMediaStore } from "./infrastructure/file-media-store.ts";
+import { FileProfileMediaStore } from "./infrastructure/file-profile-media-store.ts";
+import { FileProfileSnapshotStore } from "./infrastructure/file-profile-snapshot-store.ts";
+import { FileUnsendCache } from "./infrastructure/file-unsend-cache.ts";
 import { login } from "./infrastructure/line/auth.ts";
 import { removeStaleDownloads, YtDlpDownloader, YtDlpMediaFetcher, YtDlpSearchProvider } from "./infrastructure/yt-dlp-downloader.ts";
 import { TikTokSearchBrowser } from "./infrastructure/tiktok-search-browser.ts";
 import { LineApiProbe } from "./infrastructure/line/line-api-probe.ts";
 import { LineCoverGateway } from "./infrastructure/line/line-cover-gateway.ts";
+import { LineCoverViewer } from "./infrastructure/line/line-cover-viewer.ts";
+import { LineChatSender } from "./infrastructure/line/line-chat-sender.ts";
 import { LineGroupGateway } from "./infrastructure/line/line-group-gateway.ts";
-import { LineNotifier, LinePeopleDirectory } from "./infrastructure/line/line-notifier.ts";
+import { LinePeopleDirectory } from "./infrastructure/line/line-notifier.ts";
 import { HttpImageInspector } from "./infrastructure/http-image-inspector.ts";
 import { LineIdentityProvider } from "./infrastructure/line/line-identity.ts";
 import { LineFlexSender } from "./infrastructure/line/line-flex-sender.ts";
@@ -28,11 +36,13 @@ import { LineMediaSender } from "./infrastructure/line/line-media-sender.ts";
 import { LineProfileViewer } from "./infrastructure/line/line-profile-viewer.ts";
 import { LineProfileGateway } from "./infrastructure/line/line-profile-gateway.ts";
 import { createConsoleLogger } from "./presentation/logger.ts";
-import { LoggingMediaSender, LoggingNotifier } from "./presentation/logging-decorators.ts";
+import { LoggingChatSender, LoggingMediaSender } from "./presentation/logging-decorators.ts";
 import { startLineBot } from "./presentation/line-bot.ts";
 // Versi ini TIDAK menyertakan GroupGuard (proteksi anti-kick-massal). Pakai `main-proteksi.ts` untuk itu.
 
 await removeStaleDownloads();
+const unsendCache = new FileUnsendCache();
+await unsendCache.removeExpired();
 const logger = createConsoleLogger();
 // LINE_STORAGE memungkinkan beberapa akun (mis. akun clone untuk uji) dengan file sesi terpisah.
 const storage = new FileStorage(process.env.LINE_STORAGE ?? "./.storage.json");
@@ -45,9 +55,10 @@ const { displayName } = await client.getMyProfile();
 const profile = new LineProfileGateway(client);
 const media = new FfmpegMediaProcessor();
 const profileFlow = new ProfileFlow({ profile, media });
+const coverGateway = new LineCoverGateway(client);
 // Server LINE memotong video cover jadi 15 detik dan memakai gambar potret 9:16.
 const coverFlow = new ProfileFlow({
-  profile: new LineCoverGateway(client),
+  profile: coverGateway,
   media,
   labels: { still: "cover", video: "video cover" },
   shape: "portrait",
@@ -60,21 +71,49 @@ const mediaSaver = new MediaSaver(new FileMediaStore());
 const people = new LinePeopleDirectory(client);
 const settings = new FileSettingsStore();
 const autoReply = new AutoReply({ store: settings });
-const antiUnsend = new AntiUnsend({ store: settings, notifier: new LoggingNotifier(new LineNotifier(client), logger), people });
+const autoRead = new AutoRead({ store: settings });
+const mediaSender = new LoggingMediaSender(new LineMediaSender(client), logger);
+const antiUnsend = new AntiUnsend({
+  store: settings,
+  chatSender: new LoggingChatSender(new LineChatSender(client), logger),
+  mediaSender,
+  mediaCache: unsendCache,
+  media,
+  people,
+});
 const flex = new FlexService({ sender: new LineFlexSender(client), store: settings, identity: new LineIdentityProvider(client), inspector: new HttpImageInspector() });
-await Promise.all([autoReply.init(), antiUnsend.init(), flex.init()]);
+await Promise.all([autoReply.init(), autoRead.init(), antiUnsend.init(), flex.init()]);
 const speedTest = new SpeedTest({ probe: new LineApiProbe(client) });
 const youtube = new YoutubeVideo({ downloader: new YtDlpDownloader(), profile, media });
-const mediaSender = new LoggingMediaSender(new LineMediaSender(client), logger);
+const profileViewer = new LineProfileViewer(client);
+const coverViewer = new LineCoverViewer(coverGateway, people);
 const pictures = new ProfilePictures({
-  viewer: new LineProfileViewer(client),
+  viewer: profileViewer,
   sender: mediaSender,
   media,
   selfId: client.base.profile?.mid ?? "",
 });
+const coverPictures = new ProfilePictures({
+  viewer: coverViewer,
+  sender: mediaSender,
+  media,
+  selfId: client.base.profile?.mid ?? "",
+  commandName: "tcv",
+  label: "cover",
+});
+const snapshotStore = new FileProfileSnapshotStore();
+const saveProfile = new SaveProfile({
+  profileViewer,
+  coverViewer,
+  statusProvider: profileViewer,
+  mediaStore: new FileProfileMediaStore(),
+  snapshotStore,
+  selfId: client.base.profile?.mid ?? "",
+});
+const recoverProfile = new RecoverProfile({ snapshotStore, profile, cover: coverGateway, media });
 const downloader = new MediaDownloader({ fetcher: new YtDlpMediaFetcher(), sender: mediaSender, media });
 const search = new MediaSearch({ providers: { youtube: new YtDlpSearchProvider(), tiktok: new TikTokSearchBrowser() } });
 
 console.log(`Login sebagai ${displayName}`);
-startLineBot({ client, logger, people, profileFlow, coverFlow, account, groups, mediaSaver, autoReply, antiUnsend, speedTest, youtube, pictures, flex, downloader, search, displayName });
+startLineBot({ client, logger, people, profileFlow, coverFlow, account, groups, mediaSaver, saveProfile, recoverProfile, autoReply, autoRead, antiUnsend, speedTest, youtube, pictures, coverPictures, flex, downloader, search, displayName });
 console.log("Bot berjalan. Tekan Ctrl+C untuk berhenti.");

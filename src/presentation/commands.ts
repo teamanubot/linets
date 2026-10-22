@@ -1,5 +1,6 @@
 import type { AntiUnsend } from "../application/anti-unsend.ts";
 import type { AutoReply } from "../application/auto-reply.ts";
+import type { AutoRead } from "../application/auto-read.ts";
 import type { AccountService } from "../application/account-service.ts";
 import type { GroupService } from "../application/group-service.ts";
 import type { SpeedTest } from "../application/speed-test.ts";
@@ -10,6 +11,8 @@ import type { MediaSaver } from "../application/media-saver.ts";
 import type { FlowName, ProfileFlow } from "../application/profile-flow.ts";
 import type { MediaDownloader } from "../application/media-downloader.ts";
 import type { MediaSearch } from "../application/media-search.ts";
+import type { SaveProfile } from "../application/save-profile.ts";
+import type { RecoverProfile } from "../application/recover-profile.ts";
 import type { ChatMessage } from "../domain/chat.ts";
 import { helpCard, renderHelp } from "./help.ts";
 
@@ -21,6 +24,19 @@ function startFlow(flow: ProfileFlow, other: ProfileFlow, name: FlowName, messag
   return flow.start(name, message);
 }
 
+/** Baris status auto-reply/auto-read (global) & anti-unsend (chat ini); dipakai `tab stat` dan diperpanjang versi proteksi. */
+export function baseStatusLines(autoReply: AutoReply, autoRead: AutoRead, antiUnsend: AntiUnsend, message: ChatMessage): string[] {
+  return [
+    `Auto-reply: ${autoReply.describe()}`,
+    `Auto-read: ${autoRead.enabled ? "AKTIF" : "MATI"}`,
+    `Anti-unsend (chat ini): ${antiUnsend.isEnabled(message.chatId) ? "AKTIF" : "MATI"}`,
+  ];
+}
+
+export function renderStatus(lines: string[]): string {
+  return `📊 Status\n${lines.map((line) => `• ${line}`).join("\n")}`;
+}
+
 export type Command = (args: string, message: ChatMessage) => Promise<void>;
 
 export interface CommandDeps {
@@ -29,11 +45,15 @@ export interface CommandDeps {
   account: AccountService;
   groups: GroupService;
   mediaSaver: MediaSaver;
+  saveProfile: SaveProfile;
+  recoverProfile: RecoverProfile;
   autoReply: AutoReply;
+  autoRead: AutoRead;
   antiUnsend: AntiUnsend;
   speedTest: SpeedTest;
   youtube: YoutubeVideo;
   pictures: ProfilePictures;
+  coverPictures: ProfilePictures;
   flex: FlexService;
   downloader: MediaDownloader;
   search: MediaSearch;
@@ -46,11 +66,15 @@ export function createCommands({
   account,
   groups,
   mediaSaver,
+  saveProfile,
+  recoverProfile,
   autoReply,
+  autoRead,
   antiUnsend,
   speedTest,
   youtube,
   pictures,
+  coverPictures,
   flex,
   downloader,
   search,
@@ -85,9 +109,12 @@ export function createCommands({
     cp: (_args, message) => startFlow(coverFlow, profileFlow, "pp", message),
     cv: (_args, message) => startFlow(coverFlow, profileFlow, "vp", message),
     cv2: (_args, message) => startFlow(coverFlow, profileFlow, "vp2", message),
+    tcv: (args, message) => coverPictures.show(args, message),
     nama: (args, message) => account.setName(args, message),
     status: (args, message) => account.setStatus(args, message),
     save: (_args, message) => mediaSaver.saveReplied(message),
+    saveprofile: (args, message) => saveProfile.run(args, message),
+    recovery: (args, message) => recoverProfile.run(args, message),
     linkgrup: (_args, message) => groups.createLink(message),
     join: (args, message) => groups.join(args, message),
     namagrup: (args, message) => groups.rename(args, message),
@@ -96,7 +123,9 @@ export function createCommands({
     keluar: (args, message) => groups.leave(args, message),
     kickall: (_args, message) => groups.kickAll(_args, message),
     autoreply: (args, message) => autoReply.configure(args, message),
+    autoread: (args, message) => autoRead.configure(args, message),
     antiunsend: (args, message) => antiUnsend.configure(args, message),
+    stat: (_args, message) => message.reply(renderStatus(baseStatusLines(autoReply, autoRead, antiUnsend, message))),
     batal: async (_args, message) => {
       profileFlow.cancel();
       coverFlow.cancel();

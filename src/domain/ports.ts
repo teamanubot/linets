@@ -65,24 +65,54 @@ export interface MediaStore {
   save(data: Buffer, kind: "image" | "video"): Promise<string>;
 }
 
+/** Nama baku berkas `tab saveprofile`; selalu menimpa yang lama (tidak menumpuk file baru tiap kali disimpan). */
+export type ProfileMediaKind = "fotoprofile" | "videoprofile" | "fotocover" | "videocover";
+
+/** Penyimpanan media khusus `tab saveprofile`, dengan nama baku per jenisnya (lihat [[ProfileMediaKind]]). */
+export interface ProfileMediaStore {
+  save(kind: ProfileMediaKind, data: Buffer): Promise<string>;
+}
+
+/** Hasil `tab saveprofile`, dipulihkan lagi lewat `tab recovery`. Hanya menyimpan satu slot (yang terakhir). */
+export interface ProfileSnapshot {
+  name: string;
+  statusMessage: string;
+  profileImagePath: string | null;
+  profileVideoPath: string | null;
+  coverImagePath: string | null;
+  coverVideoPath: string | null;
+  savedAt: number;
+}
+
+export interface ProfileSnapshotStore {
+  save(snapshot: ProfileSnapshot): Promise<void>;
+  /** Snapshot terakhir yang disimpan, atau null kalau belum pernah `tab saveprofile`. */
+  load(): Promise<ProfileSnapshot | null>;
+}
+
 /** Pengaturan bot yang disimpan antar-sesi. */
 export interface BotSettings {
-  autoReply: { enabled: boolean; text: string };
-  antiUnsend: { enabled: boolean };
+  /** Global (bukan per chat), beda dari antiUnsend/groupGuard. `intervalMs`/`limit`: lihat [[AutoReply]]. */
+  autoReply: { enabled: boolean; text: string; intervalMs: number; limit: number };
+  /** Global (bukan per chat): tandai semua pesan masuk (grup & pribadi) sudah dibaca otomatis. Lihat [[AutoRead]]. */
+  autoRead: { enabled: boolean };
+  /** Per chat (grup/pribadi), bukan global; chat yang belum pernah diatur dianggap MATI (lihat [[AntiUnsend]]). */
+  antiUnsend: { chats: Record<string, boolean> };
   /** LIFF app yang dipakai untuk mengirim Flex Message; kosong = belum diatur. */
   liff: { id: string };
   /** Gaya dan tema bawaan kartu Flex (nama gaya/tema divalidasi oleh aplikasi). */
   flex: { style: string; theme: string; /** Teks kiri bar bawah gaya `latar`. */ credit: string };
-  /** Deteksi kick massal (serangan bot jahat) di grup; lihat [[GroupGuard]]. */
-  groupGuard: { enabled: boolean };
+  /** Per chat (grup/pribadi), bukan global; chat yang belum pernah diatur dianggap MATI (lihat [[GroupGuard]]). */
+  groupGuard: { chats: Record<string, boolean> };
 }
 
 export const DEFAULT_SETTINGS: BotSettings = {
-  autoReply: { enabled: false, text: "" },
-  antiUnsend: { enabled: true },
+  autoReply: { enabled: false, text: "", intervalMs: 30 * 60_000, limit: 1 },
+  autoRead: { enabled: false },
+  antiUnsend: { chats: {} },
   liff: { id: "" },
   flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" },
-  groupGuard: { enabled: true },
+  groupGuard: { chats: {} },
 };
 
 export interface SettingsStore {
@@ -93,6 +123,11 @@ export interface SettingsStore {
 /** Mengirim pemberitahuan ke pemilik akun (chat dengan diri sendiri). */
 export interface Notifier {
   notify(text: string): Promise<void>;
+}
+
+/** Mengirim teks biasa ke chat mana pun (bukan hanya chat dengan diri sendiri). */
+export interface ChatSender {
+  sendText(chatId: string, text: string): Promise<void>;
 }
 
 /** Mencari nama tampilan pengguna. */
@@ -138,11 +173,36 @@ export interface ProfileViewer {
   fetchPicture(userId: string): Promise<UserPicture>;
 }
 
-/** Mengirim gambar/video/audio ke sebuah chat (diimplementasikan oleh infrastructure). */
+/** Melihat status message pengguna mana pun, untuk `tab saveprofile`. */
+export interface ProfileStatusProvider {
+  statusMessage(userId: string): Promise<string>;
+}
+
+/** Mengirim gambar/video/audio/file ke sebuah chat (diimplementasikan oleh infrastructure). */
 export interface MediaSender {
   sendImage(chatId: string, image: Buffer): Promise<void>;
   sendVideo(chatId: string, video: Buffer, durationMs: number): Promise<void>;
   sendAudio(chatId: string, audio: Buffer, durationMs: number): Promise<void>;
+  sendFile(chatId: string, file: Buffer, filename: string): Promise<void>;
+}
+
+/** Satu berkas (gambar/video/file) yang disimpan sementara untuk anti-unsend, kalau-kalau nanti ditarik. */
+export interface CachedMedia {
+  kind: "image" | "video" | "file";
+  data: Buffer;
+  /** Nama file aslinya, hanya berarti untuk kind "file". */
+  filename?: string;
+}
+
+/**
+ * Penyimpanan sementara media (gambar/video/file) untuk anti-unsend: begitu pesan di-unsend, LINE langsung
+ * menolak unduh ulang isinya (HTTP 410), jadi harus sudah disimpan sebelumnya. Kedaluwarsa otomatis
+ * (diimplementasikan oleh infrastructure) agar tidak menumpuk selamanya.
+ */
+export interface UnsendMediaCache {
+  put(messageId: string, media: CachedMedia): Promise<void>;
+  /** Ambil media yang pernah disimpan untuk id ini (sekali pakai: dihapus dari cache); null kalau tidak ada/sudah kedaluwarsa. */
+  take(messageId: string): Promise<CachedMedia | null>;
 }
 
 /** Jenis satu berkas hasil unduhan: video (dengan suara), audio saja (mp3), atau gambar (foto post/thumbnail). */

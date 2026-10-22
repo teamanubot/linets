@@ -18,4 +18,8 @@ export class LineMediaSender implements MediaSender {
   async sendAudio(chatId: string, audio: Buffer, durationMs: number): Promise<void> {
     await this.client.base.obs.uploadObjTalk(chatId, "audio", toBlob(audio), undefined, "audio.mp3", durationMs);
   }
+
+  async sendFile(chatId: string, file: Buffer, filename: string): Promise<void> {
+    await this.client.base.obs.uploadObjTalk(chatId, "file", toBlob(file), undefined, filename);
+  }
 }

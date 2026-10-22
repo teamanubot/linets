@@ -31,6 +31,9 @@ class FakeSender implements MediaSender {
   async sendAudio(chatId: string, audio: Buffer, durationMs: number) {
     this.sent.push(`audio:${chatId}:${audio}:${durationMs}`);
   }
+  async sendFile(chatId: string, file: Buffer, filename: string) {
+    this.sent.push(`file:${chatId}:${file}:${filename}`);
+  }
 }
 
 const media: MediaProcessor = {
@@ -111,5 +114,25 @@ describe("ProfilePictures", () => {
 
     assert.deepEqual(viewer.fetched, []);
     assert.match(message.replies[0]!, /Pakai: tab tpp/);
+  });
+
+  it("commandName & label kustom (tcv/cover): dipakai di semua pesan, dengan atau tanpa video", async () => {
+    const coverService = new ProfilePictures({ viewer, sender, media, selfId: SELF, commandName: "tcv", label: "cover" });
+
+    const hint = new FakeMessage();
+    await coverService.show("", hint);
+    assert.match(hint.replies[0]!, /Pakai: tab tcv @orang \(mention\), tab tcv me, atau tab tcv <id pengguna>\.\nDi chat pribadi, tab tcv saja menampilkan foto lawan bicara\./);
+
+    const onlyImage = new FakeMessage({ mentionedIds: [SELF] });
+    await coverService.show("", onlyImage);
+    assert.match(onlyImage.replies[0]!, /Foto cover Aku$/);
+
+    const withVideo = new FakeMessage({ mentionedIds: [BUDI] });
+    await coverService.show("", withVideo);
+    assert.match(withVideo.replies[0]!, /Foto cover Budi \+ video cover/);
+
+    const none = new FakeMessage({ mentionedIds: [SARI] });
+    await coverService.show("", none);
+    assert.match(none.replies[0]!, /Sari tidak punya foto cover/);
   });
 });

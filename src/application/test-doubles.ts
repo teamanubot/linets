@@ -1,4 +1,4 @@
-import type { ChatMessage, MediaKind } from "../domain/chat.ts";
+import type { ChatMessage, FileInfo, LocationInfo, MediaKind, StickerInfo } from "../domain/chat.ts";
 import type { BotSettings, GroupGateway, MediaStore, Notifier, PeopleDirectory, ProfileGateway, SettingsStore } from "../domain/ports.ts";
 import { DEFAULT_SETTINGS } from "../domain/ports.ts";
 
@@ -106,6 +106,9 @@ export interface FakeMessageOptions {
   text?: string;
   fromSelf?: boolean;
   mediaKind?: MediaKind | null;
+  sticker?: StickerInfo | null;
+  location?: LocationInfo | null;
+  file?: FileInfo | null;
   data?: string;
   chatId?: string;
   isGroupChat?: boolean;
@@ -115,10 +118,14 @@ export interface FakeMessageOptions {
 
 export class FakeMessage implements ChatMessage {
   replies: string[] = [];
+  readCount = 0;
   readonly id: string;
   readonly senderId: string;
   readonly isFromSelf: boolean;
   readonly mediaKind: MediaKind | null;
+  readonly sticker: StickerInfo | null;
+  readonly location: LocationInfo | null;
+  readonly file: FileInfo | null;
   readonly chatId: string;
   readonly isGroupChat: boolean;
   readonly mentionedIds: string[];
@@ -132,6 +139,9 @@ export class FakeMessage implements ChatMessage {
     this.isFromSelf = options.fromSelf ?? true;
     this.body = options.text ?? "";
     this.mediaKind = options.mediaKind ?? null;
+    this.sticker = options.sticker ?? null;
+    this.location = options.location ?? null;
+    this.file = options.file ?? null;
     this.data = options.data ?? "";
     this.chatId = options.chatId ?? "cGROUP";
     this.isGroupChat = options.isGroupChat ?? true;
@@ -147,6 +157,9 @@ export class FakeMessage implements ChatMessage {
   }
   async downloadMedia() {
     return buf(this.data);
+  }
+  async markAsRead() {
+    this.readCount++;
   }
   async repliedMessage() {
     return this.replied;

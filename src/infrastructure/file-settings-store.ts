@@ -10,6 +10,7 @@ export class FileSettingsStore implements SettingsStore {
       const saved = JSON.parse(await readFile(this.path, "utf8")) as Partial<BotSettings>;
       return {
         autoReply: { ...DEFAULT_SETTINGS.autoReply, ...saved.autoReply },
+        autoRead: { ...DEFAULT_SETTINGS.autoRead, ...saved.autoRead },
         antiUnsend: { ...DEFAULT_SETTINGS.antiUnsend, ...saved.antiUnsend },
         liff: { ...DEFAULT_SETTINGS.liff, ...saved.liff },
         flex: { ...DEFAULT_SETTINGS.flex, ...saved.flex },

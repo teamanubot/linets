@@ -90,6 +90,7 @@ atau chat dengan teman). Semua perintah diawali kata `tab`:
 | `tab speed` | Ukur kecepatan respon dalam ms dan detik: ping API LINE (5×), waktu kirim pesan, dan pulang-pergi pesan. Penilaian 🟢 <500 ms · 🟡 <1,5 dtk · 🔴 lebih lambat |
 | `tab me` | Tampilkan nama akunmu |
 | `tab echo <teks>` | Bot mengulang teks |
+| `tab stat` | Status auto-reply, auto-read, anti-unsend (chat ini), dan Group Guard (grup ini, kalau versi proteksi) sekaligus dalam satu balasan |
 | `tab batal` | Batalkan alur yang sedang berjalan |
 
 ### Profil
@@ -105,6 +106,8 @@ atau chat dengan teman). Semua perintah diawali kata `tab`:
 | `tab tpp @orang` | Kirim **foto profil** orang yang di-mention ke chat ini, plus **video profil**-nya kalau ada. Bisa juga `tab tpp <id pengguna>`, maks. 3 orang sekali jalan. Video di atas 50 MB tidak dikirim |
 | `tab tpp me` | Sama, untuk akunmu sendiri. Di chat pribadi, `tab tpp` saja menampilkan foto lawan bicara |
 | `tab save` | **Reply** gambar/video lalu ketik ini untuk menyimpannya ke folder `downloads/` |
+| `tab saveprofile` | Simpan nama, status, foto profil (+video kalau ada), dan foto cover (+video kalau ada) **akun sendiri** (bukan orang lain) ke `downloads/fotoprofile.jpg`, `videoprofile.mp4`, `fotocover.jpg`, `videocover.mp4` — nama baku, tiap dipanggil menimpa yang lama (tidak menumpuk file baru), lalu membalas ringkasannya |
+| `tab recovery` | Kembalikan nama, status, foto/video profil, dan foto/video cover ke kondisi saat `tab saveprofile` **terakhir** dijalankan (satu slot, bukan riwayat). Kalau file di `downloads/` sudah dihapus, bagian itu dilewati tapi nama/status tetap dipulihkan |
 
 ### Cover (sampul profil)
 
@@ -115,6 +118,7 @@ Sama seperti foto profil, cover punya **gambar statis** dan **video** terpisah. 
 | `tab cp` | Ganti **gambar cover**. Video cover, kalau ada, tidak diubah |
 | `tab cv` | Ganti **gambar + video** cover (kirim gambar, lalu video) |
 | `tab cv2` | Ganti **video cover saja**, gambar tidak diubah |
+| `tab tcv @orang \| me` | Kirim **cover** orang yang di-mention (atau `me` untuk diri sendiri) ke chat ini. Kalau covernya cuma gambar, dikirim gambarnya saja; kalau ada video cover juga, gambar dan videonya dikirim sekaligus |
 
 **Video cover maksimal 15 detik.** Server LINE memotongnya sendiri, dan itu tidak bisa ditembus (sudah diuji dengan
 upload 20 dan 150 detik, hasilnya sama-sama 15 detik). Bot memotongnya lebih dulu sebelum mengunggah.
@@ -124,10 +128,21 @@ Berbeda dengan video foto profil yang tidak dibatasi (teruji sampai 10 menit).
 
 | Perintah | Fungsi |
 | --- | --- |
-| `tab autoreply <teks>` | Balas otomatis chat pribadi dari orang lain. Maks. sekali per orang tiap 30 menit, grup tidak dibalas. `tab autoreply off` untuk mematikan, tanpa teks untuk melihat status |
-| `tab antiunsend on/off` | Kabari kamu (di chat dengan diri sendiri) isi pesan yang ditarik orang lain. Default aktif. Hanya pesan yang diterima saat bot berjalan |
+| `tab autoreply <teks>` | Balas otomatis chat pribadi dari orang lain. Bawaan: maks. sekali per orang tiap 30 menit, grup tidak dibalas. `tab autoreply off` untuk mematikan, `tab autoreply on` untuk nyalakan lagi pakai teks terakhir (tanpa ketik ulang), tanpa teks untuk melihat status (termasuk jeda & limit yang berlaku) |
+| `tab autoreply jeda <jam> [kali]` | Atur jeda (boleh pecahan jam, mis. 0.5 = 30 menit) dan berapa kali maksimal dibalas per orang dalam jeda itu. Contoh: `tab autoreply jeda 2 2` → tiap 2 jam, maks. 2x balasan per orang |
+| `tab autoread on/off` | Tandai SEMUA pesan masuk (grup & pribadi, dari orang lain) sebagai sudah dibaca otomatis begitu diterima. Global (bukan per chat). **Bawaan MATI** |
+| `tab antiunsend on/off` | Kirim ulang isi pesan yang ditarik orang lain, ke chat tempat kejadiannya. **Per chat** (grup/pribadi masing-masing diatur sendiri, bukan global) — lihat catatan di bawah. **Bawaan MATI**; harus dinyalakan dulu per chat. Hanya pesan yang diterima saat bot berjalan |
 
-Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
+`autoreply` dan `autoread` berlaku global (satu pengaturan untuk semua chat sekaligus), **tidak** per chat
+seperti `antiunsend`/`groupguard` di bawah. Pengaturan disimpan di `.settings.json` (sudah di `.gitignore`).
+
+**Anti-unsend**: teks, foto, video, dan file yang ditarik dikirim ulang beneran; sticker dan lokasi cukup
+detailnya (sticker/lokasi tidak perlu diunduh ulang). Alasannya: begitu pesan ditarik, LINE langsung menolak
+unduh ulang isinya (sudah dicoba langsung, HTTP 410 Gone), jadi gambar/video/file harus sudah disimpan
+sementara di disk (folder `.antiunsend-cache/`, sudah di `.gitignore`) sebelum ada yang menariknya — ini berarti
+bot mengunduh setiap gambar/video/file yang lewat di chat yang dipantau, bukan hanya saat ditarik. Disimpan
+maks. 7 hari (dihapus otomatis setelah itu, juga berkas di atas 100 MB tidak dicache sama sekali). Kalau sudah
+lewat 7 hari atau gagal tersimpan, cuma jenisnya yang diberi tahu ("sudah tidak bisa diambil ulang").
 
 ### Unduh media
 

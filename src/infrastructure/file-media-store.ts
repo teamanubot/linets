@@ -14,11 +14,17 @@ function detectExtension(data: Buffer, kind: "image" | "video"): string {
 
 /** Simpan media ke folder lokal (default `./downloads`). */
 export class FileMediaStore implements MediaStore {
+  // `Date.now()` saja bisa sama kalau beberapa `save()` dipanggil dalam milidetik yang sama (mis. lewat
+  // Promise.all di tab saveprofile), membuat satu file menimpa yang lain tanpa pesan error. Penghitung ini
+  // menjamin tiap panggilan dapat nama berkas yang unik walau waktunya sama persis.
+  private static sequence = 0;
+
   constructor(private readonly directory = "./downloads") {}
 
   async save(data: Buffer, kind: "image" | "video"): Promise<string> {
     await mkdir(this.directory, { recursive: true });
-    const path = join(this.directory, `${Date.now()}.${detectExtension(data, kind)}`);
+    const unique = `${Date.now()}-${(FileMediaStore.sequence++).toString(36)}`;
+    const path = join(this.directory, `${unique}.${detectExtension(data, kind)}`);
     await writeFile(path, data);
     return path;
   }

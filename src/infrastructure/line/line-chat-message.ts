@@ -1,5 +1,5 @@
 import type { TalkMessage } from "@tab/linets";
-import type { ChatMessage, MediaKind } from "../../domain/chat.ts";
+import type { ChatMessage, FileInfo, LocationInfo, MediaKind, StickerInfo } from "../../domain/chat.ts";
 import type { LineMessageResolver } from "./line-message-resolver.ts";
 
 const DOWNLOAD_ATTEMPTS = 30;
@@ -51,6 +51,28 @@ export class LineChatMessage implements ChatMessage {
     if (type === 1 || type === "IMAGE") return "image";
     if (type === 2 || type === "VIDEO") return "video";
     return null;
+  }
+
+  get sticker(): StickerInfo | null {
+    if (this.message.raw.contentType !== 7 && this.message.raw.contentType !== "STICKER") return null;
+    const metadata = this.message.raw.contentMetadata as Record<string, string> | undefined;
+    const packageId = metadata?.STKPKGID;
+    const stickerId = metadata?.STKID;
+    return packageId && stickerId ? { packageId, stickerId } : null;
+  }
+
+  get location(): LocationInfo | null {
+    const location = this.message.raw.location;
+    if (!location) return null;
+    return { title: location.title ?? "", address: location.address ?? "", latitude: location.latitude, longitude: location.longitude };
+  }
+
+  get file(): FileInfo | null {
+    if (this.message.raw.contentType !== 14 && this.message.raw.contentType !== "FILE") return null;
+    const metadata = this.message.raw.contentMetadata as Record<string, string> | undefined;
+    const name = metadata?.FILE_NAME;
+    if (!name) return null;
+    return { name, size: Number(metadata?.FILE_SIZE ?? 0) };
   }
 
   get chatId(): string {
@@ -108,5 +130,9 @@ export class LineChatMessage implements ChatMessage {
       await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_RETRY_MS));
     }
     throw new Error("Media belum siap diunduh dari server LINE. Coba kirim ulang.");
+  }
+
+  async markAsRead(): Promise<void> {
+    await this.message.read();
   }
 }

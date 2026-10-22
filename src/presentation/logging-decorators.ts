@@ -1,5 +1,5 @@
-import type { ChatMessage, MediaKind } from "../domain/chat.ts";
-import type { MediaSender, Notifier } from "../domain/ports.ts";
+import type { ChatMessage, FileInfo, LocationInfo, MediaKind, StickerInfo } from "../domain/chat.ts";
+import type { ChatSender, MediaSender, Notifier } from "../domain/ports.ts";
 import { shorten, type Logger } from "./logger.ts";
 
 /** Pratinjau isi pesan untuk log: teks dipotong, media/stiker diberi label. */
@@ -22,12 +22,19 @@ export class LoggingChatMessage implements ChatMessage {
   get text() { return this.inner.text; }
   get isFromSelf() { return this.inner.isFromSelf; }
   get mediaKind() { return this.inner.mediaKind; }
+  get sticker(): StickerInfo | null { return this.inner.sticker; }
+  get location(): LocationInfo | null { return this.inner.location; }
+  get file(): FileInfo | null { return this.inner.file; }
   get chatId() { return this.inner.chatId; }
   get isGroupChat() { return this.inner.isGroupChat; }
   get mentionedIds() { return this.inner.mentionedIds; }
 
   downloadMedia() {
     return this.inner.downloadMedia();
+  }
+
+  markAsRead() {
+    return this.inner.markAsRead();
   }
 
   async repliedMessage(): Promise<ChatMessage | null> {
@@ -61,6 +68,24 @@ export class LoggingMediaSender implements MediaSender {
   async sendAudio(chatId: string, audio: Buffer, durationMs: number): Promise<void> {
     this.logger.info(`📤 kirim audio (${(audio.length / 1024 / 1024).toFixed(1)} MB, ${(durationMs / 1000).toFixed(0)} dtk)`);
     await this.inner.sendAudio(chatId, audio, durationMs);
+  }
+
+  async sendFile(chatId: string, file: Buffer, filename: string): Promise<void> {
+    this.logger.info(`📤 kirim file "${filename}" (${(file.length / 1024 / 1024).toFixed(1)} MB)`);
+    await this.inner.sendFile(chatId, file, filename);
+  }
+}
+
+/** Mencatat teks yang dikirim bot ke chat mana pun. */
+export class LoggingChatSender implements ChatSender {
+  constructor(
+    private readonly inner: ChatSender,
+    private readonly logger: Logger,
+  ) {}
+
+  async sendText(chatId: string, text: string): Promise<void> {
+    this.logger.info(`📤 kirim (${chatId}): ${previewOf(text, null)}`);
+    await this.inner.sendText(chatId, text);
   }
 }
 

@@ -1,9 +1,11 @@
 .storage.json
 .storage-*.json
 .settings.json
+.saveprofile-snapshot.json
 node_modules
 downloads
 apng-out
+.antiunsend-cache
 
 # Group Guard (proteksi anti-kick-massal): tidak dicommit, hanya ada lokal.
 # npm start default jalan tanpa ini kalau src/main-proteksi.ts tidak ada.

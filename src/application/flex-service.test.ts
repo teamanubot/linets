@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import type { FlexSender, ImageFacts, ImageInspector } from "../domain/ports.ts";
+import { DEFAULT_SETTINGS, type FlexSender, type ImageFacts, type ImageInspector } from "../domain/ports.ts";
 import { animationWarnings, CARD_THEMES, FlexService } from "./flex-service.ts";
 import { FakeMessage, FakeSettingsStore } from "./test-doubles.ts";
 
@@ -164,7 +164,7 @@ describe("FlexService", () => {
   });
 
   it("pengaturan LIFF dimuat dari penyimpanan saat init", async () => {
-    const saved = new FakeSettingsStore({ autoReply: { enabled: false, text: "" }, antiUnsend: { enabled: true }, liff: { id: LIFF }, flex: { style: "chino", theme: "pink", credit: "Powered By TeamAnuBot" }, groupGuard: { enabled: true } });
+    const saved = new FakeSettingsStore({ ...structuredClone(DEFAULT_SETTINGS), liff: { id: LIFF } });
     const loaded = new FlexService({ sender, store: saved });
     await loaded.init();
     await loaded.sendCard("J | I", new FakeMessage());

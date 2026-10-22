@@ -25,7 +25,7 @@ async function nameForLog(people: PeopleDirectory, userId: string): Promise<stri
 
 /** Hubungkan event pesan LINE ke perintah dan alur profil, lalu mulai mendengarkan. */
 export function startLineBot({ client, people, logger = createConsoleLogger(), ...commandDeps }: LineBotDeps): void {
-  const { profileFlow, coverFlow, antiUnsend, autoReply, speedTest } = commandDeps;
+  const { profileFlow, coverFlow, antiUnsend, autoReply, autoRead, speedTest } = commandDeps;
   const commands = createCommands(commandDeps);
   const resolver = new LineMessageResolver(client);
   const startedAt = Date.now();
@@ -41,7 +41,7 @@ export function startLineBot({ client, people, logger = createConsoleLogger(), .
     if (operation.type === "DESTROY_MESSAGE" || operation.type === "NOTIFIED_DESTROY_MESSAGE") {
       antiUnsend
         .onUnsent(operation.param2)
-        .then((notified) => notified && logger.info("anti-unsend → isi pesan yang ditarik dikirim ke chat sendiri"))
+        .then((notified) => notified && logger.info("anti-unsend → isi pesan yang ditarik dikirim ulang ke chat itu"))
         .catch((error) => logger.error(`anti-unsend → gagal: ${shorten(String(error?.message ?? error), 120)}`));
     }
   });
@@ -68,6 +68,11 @@ export function startLineBot({ client, people, logger = createConsoleLogger(), .
         if (await autoReply.handleIncoming(message)) logger.info(`🤖 auto-reply ke ${sender}`);
       } catch (error) {
         logger.error(`auto-reply → gagal: ${shorten(String((error as Error)?.message ?? error), 120)}`);
+      }
+      try {
+        await autoRead.handleIncoming(message);
+      } catch (error) {
+        logger.error(`auto-read → gagal: ${shorten(String((error as Error)?.message ?? error), 120)}`);
       }
       return;
     }

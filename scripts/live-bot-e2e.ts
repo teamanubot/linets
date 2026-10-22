@@ -16,21 +16,29 @@ import { ProfilePictures } from "../src/application/profile-pictures.ts";
 import { YoutubeVideo } from "../src/application/youtube-video.ts";
 import { MediaDownloader } from "../src/application/media-downloader.ts";
 import { MediaSearch } from "../src/application/media-search.ts";
+import { SaveProfile } from "../src/application/save-profile.ts";
+import { RecoverProfile } from "../src/application/recover-profile.ts";
 import { SpeedTest } from "../src/application/speed-test.ts";
 import { AutoReply } from "../src/application/auto-reply.ts";
+import { AutoRead } from "../src/application/auto-read.ts";
 import { GroupService } from "../src/application/group-service.ts";
 import { MediaSaver } from "../src/application/media-saver.ts";
 import { ProfileFlow } from "../src/application/profile-flow.ts";
 import { FfmpegMediaProcessor, runFfmpeg, withTempDir } from "../src/infrastructure/ffmpeg/ffmpeg-media-processor.ts";
 import { FileMediaStore } from "../src/infrastructure/file-media-store.ts";
+import { FileProfileMediaStore } from "../src/infrastructure/file-profile-media-store.ts";
+import { FileProfileSnapshotStore } from "../src/infrastructure/file-profile-snapshot-store.ts";
 import { FileSettingsStore } from "../src/infrastructure/file-settings-store.ts";
+import { FileUnsendCache } from "../src/infrastructure/file-unsend-cache.ts";
 import { login } from "../src/infrastructure/line/auth.ts";
 import { YtDlpDownloader, YtDlpMediaFetcher, YtDlpSearchProvider } from "../src/infrastructure/yt-dlp-downloader.ts";
 import { TikTokSearchBrowser } from "../src/infrastructure/tiktok-search-browser.ts";
 import { LineApiProbe } from "../src/infrastructure/line/line-api-probe.ts";
 import { LineCoverGateway } from "../src/infrastructure/line/line-cover-gateway.ts";
+import { LineChatSender } from "../src/infrastructure/line/line-chat-sender.ts";
+import { LineCoverViewer } from "../src/infrastructure/line/line-cover-viewer.ts";
 import { LineGroupGateway } from "../src/infrastructure/line/line-group-gateway.ts";
-import { LineNotifier, LinePeopleDirectory } from "../src/infrastructure/line/line-notifier.ts";
+import { LinePeopleDirectory } from "../src/infrastructure/line/line-notifier.ts";
 import { LineFlexSender } from "../src/infrastructure/line/line-flex-sender.ts";
 import { LineMediaSender } from "../src/infrastructure/line/line-media-sender.ts";
 import { LineProfileViewer } from "../src/infrastructure/line/line-profile-viewer.ts";
@@ -48,15 +56,25 @@ const settings = new FileSettingsStore(join(workDir, "settings-test.json"));
 const profile = new LineProfileGateway(client);
 const media = new FfmpegMediaProcessor();
 const autoReply = new AutoReply({ store: settings });
-const antiUnsend = new AntiUnsend({ store: settings, notifier: new LineNotifier(client), people: new LinePeopleDirectory(client) });
-await Promise.all([autoReply.init(), antiUnsend.init()]);
+const autoRead = new AutoRead({ store: settings });
+const mediaSender = new LineMediaSender(client);
+const antiUnsend = new AntiUnsend({
+  store: settings,
+  chatSender: new LineChatSender(client),
+  mediaSender,
+  mediaCache: new FileUnsendCache({ dir: join(workDir, "unsend-cache") }),
+  media,
+  people: new LinePeopleDirectory(client),
+});
+const coverGateway = new LineCoverGateway(client);
+await Promise.all([autoReply.init(), autoRead.init(), antiUnsend.init()]);
 startLineBot({
   client,
   people: new LinePeopleDirectory(client),
   displayName: "uji",
   profileFlow: new ProfileFlow({ profile, media }),
   coverFlow: new ProfileFlow({
-    profile: new LineCoverGateway(client),
+    profile: coverGateway,
     media,
     labels: { still: "cover", video: "video cover" },
     shape: "portrait",
@@ -65,12 +83,35 @@ startLineBot({
   account: new AccountService(profile),
   groups: new GroupService(new LineGroupGateway(client), mid),
   mediaSaver: new MediaSaver(new FileMediaStore(join(workDir, "downloads"))),
+  saveProfile: new SaveProfile({
+    profileViewer: new LineProfileViewer(client),
+    coverViewer: new LineCoverViewer(coverGateway, new LinePeopleDirectory(client)),
+    statusProvider: new LineProfileViewer(client),
+    mediaStore: new FileProfileMediaStore(join(workDir, "downloads")),
+    snapshotStore: new FileProfileSnapshotStore(join(workDir, "saveprofile-snapshot.json")),
+    selfId: mid,
+  }),
+  recoverProfile: new RecoverProfile({
+    snapshotStore: new FileProfileSnapshotStore(join(workDir, "saveprofile-snapshot.json")),
+    profile,
+    cover: coverGateway,
+    media,
+  }),
   autoReply,
+  autoRead,
   antiUnsend,
   speedTest: new SpeedTest({ probe: new LineApiProbe(client) }),
   youtube: new YoutubeVideo({ downloader: new YtDlpDownloader(), profile, media }),
   flex: new FlexService({ sender: new LineFlexSender(client), store: settings }),
   pictures: new ProfilePictures({ viewer: new LineProfileViewer(client), sender: new LineMediaSender(client), media, selfId: mid }),
+  coverPictures: new ProfilePictures({
+    viewer: new LineCoverViewer(coverGateway, new LinePeopleDirectory(client)),
+    sender: new LineMediaSender(client),
+    media,
+    selfId: mid,
+    commandName: "tcv",
+    label: "cover",
+  }),
   downloader: new MediaDownloader({ fetcher: new YtDlpMediaFetcher(), sender: new LineMediaSender(client), media }),
   search: new MediaSearch({ providers: { youtube: new YtDlpSearchProvider(), tiktok: new TikTokSearchBrowser() } }),
 });

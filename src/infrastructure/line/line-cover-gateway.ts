@@ -5,12 +5,12 @@ import type { PictureGateway } from "../../domain/ports.ts";
 const HOME_CHANNEL_ID = "1341209850";
 const COVER_PATH = "/api/v1/home/cover.json";
 
-interface ObsInfo {
+export interface ObsInfo {
   objectId: string;
 }
 
-interface CoverInfo {
-  coverObsInfo: ObsInfo;
+export interface CoverInfo {
+  coverObsInfo?: ObsInfo | null;
   videoCoverObsInfo?: ObsInfo | null;
 }
 
@@ -53,6 +53,7 @@ export class LineCoverGateway implements PictureGateway {
 
   async setVideoKeepImage(video: Buffer): Promise<void> {
     const { coverObsInfo } = await this.readCover();
+    if (!coverObsInfo) throw new Error("Belum ada cover; kirim gambar dulu (tab cp) sebelum video saja (tab cv2).");
     const videoId = await this.uploadVideo(video);
     await this.writeCover({ coverObjectId: coverObsInfo.objectId, videoCoverObjectId: videoId });
   }
@@ -84,7 +85,22 @@ export class LineCoverGateway implements PictureGateway {
   }
 
   private async readCover(): Promise<CoverInfo> {
-    return this.home<CoverInfo>("GET", await this.channelToken(), `${COVER_PATH}?homeId=${this.mid}`);
+    return this.fetchCoverInfo(this.mid);
+  }
+
+  /** Info cover (gambar + video kalau ada) milik siapa pun, bukan hanya akun sendiri. Dipakai oleh `LineCoverViewer`. */
+  async fetchCoverInfo(userId: string): Promise<CoverInfo> {
+    return this.home<CoverInfo>("GET", await this.channelToken(), `${COVER_PATH}?homeId=${userId}`);
+  }
+
+  /** Unduh gambar/video cover dari `myhome/c/{id}` atau `myhome/vc/{id}`. Dipakai oleh `LineCoverViewer`. */
+  async downloadMedia(namespace: "c" | "vc", info: ObsInfo): Promise<Buffer> {
+    const blob = await this.client.base.obs.downloadObjectForService({
+      obsPath: `myhome/${namespace}`,
+      oid: info.objectId,
+      addHeaders: { "X-Line-ChannelToken": await this.channelToken() },
+    });
+    return Buffer.from(await blob.arrayBuffer());
   }
 
   private async writeCover(ids: { coverObjectId: string; videoCoverObjectId?: string }): Promise<void> {
